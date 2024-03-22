@@ -63,3 +63,26 @@ kustomize build control-plane/nncp > nncp.yaml
 kustomize build control-plane > control-plane.yaml
 popd
 ```
+
+## CRs: pre-ceph data plan
+
+- [dataplane-pre-ceph.yaml](dataplane-pre-ceph.yaml)
+
+### Apply and Verify
+
+```
+oc apply -f dataplane-pre-ceph.yaml
+oc get pods -w -l app=openstackansibleee
+oc wait osdpd edpm-deployment-pre-ceph --for condition=Ready --timeout=1200s
+```
+
+### Optional CR generation
+
+```
+pushd ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/
+cp ~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-values/values.yaml edpm-pre-ceph/values.yaml
+kustomize build control-plane/nncp > nncp.yaml
+kustomize build edpm-pre-ceph > dataplane-pre-ceph.yaml
+popd
+```
+Ensure the `nodes` list only has has three computes.
