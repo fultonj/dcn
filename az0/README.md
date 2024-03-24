@@ -81,7 +81,6 @@ oc wait osdpd edpm-deployment-pre-ceph --for condition=Ready --timeout=1200s
 ```
 pushd ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/
 cp ~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-values/values.yaml edpm-pre-ceph/values.yaml
-kustomize build control-plane/nncp > nncp.yaml
 kustomize build edpm-pre-ceph > dataplane-pre-ceph.yaml
 popd
 ```
