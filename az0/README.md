@@ -85,3 +85,31 @@ kustomize build edpm-pre-ceph > dataplane-pre-ceph.yaml
 popd
 ```
 Ensure the `nodes` list only has has three computes.
+
+## Deploy Ceph for az0
+
+In this step the `cephadm` tool should be used to deploy Ceph on
+edpm-compute-0, edpm-compute-1 and edpm-compute-2.
+
+### Optional
+
+For test environments the ci-framework may be used to deploy Ceph.
+
+```
+export START=100
+cd ~/src/github.com/openstack-k8s-operators/ci-framework/
+export N=2
+echo -e "localhost ansible_connection=local\n[computes]" > inventory.yml
+for I in $(seq $START $((N+100))); do
+  echo 192.168.122.${I} >> inventory.yml
+done
+
+ln -s ~/dcn/lib/ceph_az0.yaml
+ln -s ~/hci.yaml
+
+export ANSIBLE_REMOTE_USER=zuul
+export ANSIBLE_SSH_PRIVATE_KEY=~/.ssh/id_cifw
+export ANSIBLE_HOST_KEY_CHECKING=False
+
+ANSIBLE_GATHERING=implicit ansible-playbook playbooks/ceph.yml -e @hci.yaml -e @ceph_az0.yaml
+```
