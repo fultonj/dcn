@@ -64,7 +64,7 @@ kustomize build control-plane > control-plane.yaml
 popd
 ```
 
-## CRs: pre-ceph data plan
+## CRs: pre-ceph data plane
 
 - [dataplane-pre-ceph.yaml](dataplane-pre-ceph.yaml)
 
@@ -86,14 +86,22 @@ popd
 ```
 Ensure the `nodes` list only has has three computes.
 
-## Deploy Ceph for az0
+## Deploy Ceph for AZ0
 
 In this step the `cephadm` tool should be used to deploy Ceph on
 edpm-compute-0, edpm-compute-1 and edpm-compute-2.
 
+After the Ceph cluster is deployed create pools for Nova, Cinder and
+Glance, and then create an openstack keyring to access them. Export
+the keyring and a ceph configuration file to a secret CR. Steps to
+do this are documented
+[upstream](https://github.com/openstack-k8s-operators/docs/blob/main/ceph.md)
+and in the Deployment document from
+[Development Preview](https://access.redhat.com/rhosp-18-dev-preview-3-release-notes).
+
 ### Optional
 
-For test environments the ci-framework may be used to deploy Ceph.
+For test environments, the ci-framework may be used to deploy Ceph.
 
 ```
 export START=100
@@ -113,3 +121,39 @@ export ANSIBLE_HOST_KEY_CHECKING=False
 
 ANSIBLE_GATHERING=implicit ansible-playbook playbooks/ceph.yml -e @hci.yaml -e @ceph_az0.yaml
 ```
+
+## CRs: post-ceph control and data plane
+
+- [post-ceph.yaml](post-ceph.yaml)
+
+### Apply and Verify
+```
+oc apply -f post-ceph.yaml
+```
+Wait for post-Ceph control plane to be available after updating
+```
+oc wait osctlplane controlplane --for condition=Ready --timeout=600s
+```
+Wait for post-Ceph data plane deployment to finish
+```
+oc wait osdpd edpm-deployment-post-ceph --for condition=Ready --timeout=1200s
+```
+
+### Optional CR generation
+```
+pushd ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/
+cp /tmp/edpm_values_post_ceph.yaml ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/values.yaml
+cp /tmp/edpm_service_values_post_ceph.yaml ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
+kustomize build > post-ceph.yaml
+popd
+```
+Ensure the `nodes` list only has has three computes.
+
+## Finialize Nova computes
+
+Ask Nova to discover all compute hosts in AZ0.
+```
+oc rsh nova-cell0-conductor-0 nova-manage cell_v2 discover_hosts --verbose
+```
+
+AZ0 should now be deployed. Next [deploy AZ1](../az1).
