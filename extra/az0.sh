@@ -109,19 +109,10 @@ if [ $DATAPLANE -eq 1 ]; then
     echo -e "\noc get pods -w -l app=openstackansibleee\n"
 
     pushd examples/va/hci/
-    cp $SRC edpm-pre-ceph/values.yaml
-    
-    NODES=$(grep edpm-compute edpm-pre-ceph/values.yaml | awk {'print $1'} | sort | uniq | wc -l)
-    if [[ ! $NODES -eq 3 ]]; then
-        echo "Aborting. You only want to deploy 3 nodes, not $NODES"
-        grep edpm-compute $SRC | awk {'print $1'} | sort | uniq
-        echo $SRC
-        exit 1
-    fi
+    python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/values.yaml --beg 0 --end 2
     kustomize build edpm-pre-ceph > dataplane-pre-ceph.yaml
     oc create -f dataplane-pre-ceph.yaml
     oc wait osdpd edpm-deployment-pre-ceph --for condition=Ready --timeout=1200s
-
     popd
 fi
 
