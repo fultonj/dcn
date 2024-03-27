@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Personal script for automting AZ0 deployment using:
 # - https://github.com/openstack-k8s-operators/ci-framework
@@ -117,26 +117,7 @@ if [ $DATAPLANE -eq 1 ]; then
 fi
 
 if [ $CEPH -eq 1 ]; then
-    export START=100
-    pushd ~/src/github.com/openstack-k8s-operators/ci-framework/
-    export N=2
-    echo -e "localhost ansible_connection=local\n[computes]" > inventory.yml
-    for I in $(seq $START $((N+100))); do
-        echo 192.168.122.${I} >> inventory.yml
-    done
-    export ANSIBLE_REMOTE_USER=zuul
-    export ANSIBLE_SSH_PRIVATE_KEY=~/.ssh/id_cifw
-    export ANSIBLE_HOST_KEY_CHECKING=False
-
-    ansible -i inventory.yml -m ping computes
-    if [ $? -gt 0 ]; then
-        echo "inventory problem"
-        exit 1
-    fi
-    ln -fs ~/dcn/extra/ceph_az0.yaml
-    ln -fs ~/hci.yaml
-    ANSIBLE_GATHERING=implicit ansible-playbook playbooks/ceph.yml -e @hci.yaml -e @ceph_az0.yaml
-    popd
+    bash ~/dcn/extra/ceph.sh 100 ceph_az0.yaml
 fi
 
 if [ $POSTCEPH -eq 1 ]; then
