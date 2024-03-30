@@ -25,6 +25,7 @@ if [ $? -gt 0 ]; then
     echo "inventory problem"
     exit 1
 fi
+ln -fs ~/dcn/extra/ceph.yaml
 ln -fs ~/dcn/extra/$2
 ln -fs ~/hci.yaml
 ANSIBLE_GATHERING=implicit ansible-playbook playbooks/ceph.yml -e @hci.yaml -e @ceph.yaml -e @$2
