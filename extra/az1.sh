@@ -31,13 +31,10 @@ if [ $DATAPLANE -eq 1 ]; then
 
     pushd examples/va/hci/
     python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/values.yaml --beg 3 --end 5
-    kustomize build edpm-pre-ceph > dataplane-pre-ceph-az1.yaml
-
-    # need to do additional edits to dataplane-pre-ceph-az1.yaml to make another nodeset
-    
-    
-    # oc create -f dataplane-pre-ceph.yaml
-    # oc wait osdpd edpm-deployment-pre-ceph --for condition=Ready --timeout=1200s
+    kustomize build edpm-pre-ceph > dataplane-pre-ceph-az1-temp.yaml
+    python ~/dcn/extra/nodeset_name.py dataplane-pre-ceph-az1-temp.yaml dataplane-pre-ceph-az1.yaml --num 1
+    oc create -f dataplane-pre-ceph-az1.yaml
+    oc wait osdpd edpm-deployment-pre-ceph-az1 --for condition=Ready --timeout=1200s
     popd
 fi
 
