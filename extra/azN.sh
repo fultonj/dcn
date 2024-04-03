@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# Personal script for automting AZ1 deployment using:
+# Personal script for automating AZn deployment using:
 # - https://github.com/openstack-k8s-operators/ci-framework
 # - https://github.com/openstack-k8s-operators/architecture/tree/main/examples/va/hci
-# 
+#
 # The above and how it is kustomized is still experimental, and not part
 # of the product, though it can be used to solve the problem of environment
 # creation and environment variable substitution for testing.
@@ -12,6 +12,26 @@ DATAPLANE=0
 CEPH=0
 POSTCEPH=0
 DISCOVER=0
+
+# 1 for AZ1 xor 2 for AZ2
+NUM=1
+
+if [ $NUM -eq 1 ]; then
+    BEG=3
+    END=5
+    CEPH_LAST_OCTET=103
+    CEPH_OVERRIDE=ceph_az1.yaml
+    EDPM_PRE_CR=edpm-deployment-pre-ceph-az1
+    EDPM_POST_CR=edpm-deployment-post-ceph-az1
+fi
+if [ $NUM -eq 2 ]; then
+    BEG=6
+    END=8
+    CEPH_LAST_OCTET=106
+    CEPH_OVERRIDE=ceph_az2.yaml
+    EDPM_PRE_CR=edpm-deployment-pre-ceph-az2
+    EDPM_POST_CR=edpm-deployment-post-ceph-az2
+fi
 
 export PASS=$(cat ~/.kube/kubeadmin-password)
 oc login -u kubeadmin -p $PASS https://api.ocp.openstack.lab:6443
@@ -61,21 +81,21 @@ if [ $DATAPLANE -eq 1 ]; then
     echo -e "\noc get pods -w -l app=openstackansibleee\n"
 
     pushd examples/va/hci/
-    python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/values.yaml --beg 3 --end 5
-    kustomize build edpm-pre-ceph > dataplane-pre-ceph-az1-temp.yaml
-    # change the name to include az1 and exclude secrets
-    python ~/dcn/extra/nodeset_name.py dataplane-pre-ceph-az1-temp.yaml dataplane-pre-ceph-az1.yaml --num 1
-    oc create -f dataplane-pre-ceph-az1.yaml
-    oc wait osdpd edpm-deployment-pre-ceph-az1 --for condition=Ready --timeout=1200s
+    python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/values.yaml --beg $BEG --end $END
+    kustomize build edpm-pre-ceph > dataplane-pre-ceph-azN-temp.yaml
+    # change the name to include azN and exclude secrets
+    python ~/dcn/extra/nodeset_name.py dataplane-pre-ceph-azN-temp.yaml dataplane-pre-ceph-azN.yaml --num $NUM
+    oc create -f dataplane-pre-ceph-azN.yaml
+    oc wait osdpd $EDPM_PRE_CR --for condition=Ready --timeout=1200s
     popd
 fi
 
 if [ $CEPH -eq 1 ]; then
-    bash ~/dcn/extra/ceph.sh 103 ceph_az1.yaml
+    bash ~/dcn/extra/ceph.sh $CEPH_LAST_OCTET $CEPH_OVERRIDE
 fi
 
 if [ $POSTCEPH -eq 1 ]; then
-    # The AZ1 ceph deployment will overwrite the AZ0 versions with AZ1 versions
+    # The AZN ceph deployment will overwrite the AZ0 versions with AZN versions
     SRC1=/tmp/edpm_values_post_ceph.yaml
     SRC2=/tmp/edpm_service_values_post_ceph.yaml
     for SRC in $SRC1 $SRC2; do
@@ -87,7 +107,7 @@ if [ $POSTCEPH -eq 1 ]; then
     pushd examples/va/hci/
     cp $SRC1 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/values.yaml
     cp $SRC2 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
-    kustomize build > post-ceph-az1-temp.yaml
+    kustomize build > post-ceph-azN-temp.yaml
 
     # Modify kustomize output with python to suit DCN scenario for any azN > 0
     # For the control plane we want:
@@ -98,20 +118,20 @@ if [ $POSTCEPH -eq 1 ]; then
     #
     # For the data plane we want:
     #   - to deploy the same genereated post ceph config
-    python ~/dcn/extra/post-ceph-azn.py post-ceph-az1-temp.yaml post-ceph-az1.yaml \
-	   --num 1 \
+    python ~/dcn/extra/post-ceph-azn.py post-ceph-azN-temp.yaml post-ceph-azN.yaml \
+	   --num $NUM \
 	   --ceph-secret $CEPH_SECRET_FILE \
 	   --control-plane-cr $CONTROL_PLANE_CR_FILE
 
-    # Apply the single modified post-ceph-az1.yaml file
-    # oc apply -f post-ceph-az1.yaml
+    # Apply the single modified post-ceph-azN.yaml file
+    # oc apply -f post-ceph-azN.yaml
 
     # echo -e "\noc get pods -n openstack -w\n"
     # oc wait osctlplane controlplane --for condition=Ready --timeout=600s
 
     # Wait for ansible to finish
     # echo -e "\noc get pods -w -l app=openstackansibleee\n"
-    # oc wait osdpd edpm-deployment-post-ceph-az1 --for condition=Ready --timeout=1200s
+    # oc wait osdpd $EDPM_POST_CR --for condition=Ready --timeout=1200s
     popd
 fi
 
