@@ -19,6 +19,22 @@ if [[ $? -gt 0 ]]; then
     exit 1
 fi
 
+# identify first ceph deployment secret file
+export CEPH_SECRET_FILE=~/az0_ceph_secret.yaml
+if [[ ! -e $CEPH_SECRET_FILE ]]; then
+    echo "CEPH_SECRET_FILE $CEPH_SECRET_FILE is missing; copying new one"
+    if [[ ! -e /tmp/k8s_ceph_secret.yml ]]; then
+	echo "Secret from first ceph deployment is missing; unable to copy"
+	exit 1
+    else
+	cp -v /tmp/k8s_ceph_secret.yml $CEPH_SECRET_FILE
+    fi
+fi
+
+# identify first control plane CR
+export CONTROL_PLANE_CR_FILE=control-plane-cr.yaml
+# TODO: need a way to genereate this file automatically
+
 pushd ~/src/github.com/openstack-k8s-operators/architecture
 
 if [ $DATAPLANE -eq 1 ]; then
@@ -32,6 +48,7 @@ if [ $DATAPLANE -eq 1 ]; then
     pushd examples/va/hci/
     python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/values.yaml --beg 3 --end 5
     kustomize build edpm-pre-ceph > dataplane-pre-ceph-az1-temp.yaml
+    # change the name to include az1 and exclude secrets
     python ~/dcn/extra/nodeset_name.py dataplane-pre-ceph-az1-temp.yaml dataplane-pre-ceph-az1.yaml --num 1
     oc create -f dataplane-pre-ceph-az1.yaml
     oc wait osdpd edpm-deployment-pre-ceph-az1 --for condition=Ready --timeout=1200s
@@ -40,6 +57,53 @@ fi
 
 if [ $CEPH -eq 1 ]; then
     bash ~/dcn/extra/ceph.sh 103 ceph_az1.yaml
+fi
+
+if [ $POSTCEPH -eq 1 ]; then
+    # The AZ1 ceph deployment will overwrite the AZ0 versions with AZ1 versions
+    SRC1=/tmp/edpm_values_post_ceph.yaml
+    SRC2=/tmp/edpm_service_values_post_ceph.yaml
+    for SRC in $SRC1 $SRC2; do
+        if [[ ! -e $SRC ]]; then
+            echo "$SRC is missing"
+            exit 1
+        fi
+    done
+    pushd examples/va/hci/
+    cp $SRC1 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/values.yaml
+    cp $SRC2 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
+    kustomize build > post-ceph-az1-temp.yaml
+
+    # Modify kustomize output with python to suit DCN scenario for any azN > 0
+    # For the control plane we want:
+    #   - a new glance edge instance with two backends (az0 and azN)
+    #   - the default glance to keep using it's current backends but add azN
+    #     (this currently has limitation as only az0 and last azN are used)
+    #   - a new cinder-volume instance with its own new backend
+    #
+    # For the data plane we want:
+    #   - to deploy the same genereated post ceph config
+    python ~/dcn/extra/post-ceph-azn.py post-ceph-az1-temp.yaml post-ceph-az1.yaml \
+	   --num 1 \
+	   --ceph-secret $CEPH_SECRET_FILE \
+	   --control-plane-cr $CONTROL_PLANE_CR_FILE
+
+    # Apply the single modified post-ceph-az1.yaml file
+    # oc apply -f post-ceph-az1.yaml
+
+    # echo -e "\noc get pods -n openstack -w\n"
+    # oc wait osctlplane controlplane --for condition=Ready --timeout=600s
+
+    # Wait for ansible to finish
+    # echo -e "\noc get pods -w -l app=openstackansibleee\n"
+    # oc wait osdpd edpm-deployment-post-ceph-az1 --for condition=Ready --timeout=1200s
+    popd
+fi
+
+if [ $DISCOVER -eq 1 ]; then
+    oc rsh nova-cell0-conductor-0 nova-manage cell_v2 discover_hosts --verbose
+    oc rsh openstackclient openstack compute service list
+    oc rsh openstackclient openstack network agent list
 fi
 
 popd
