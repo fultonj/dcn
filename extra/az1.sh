@@ -19,6 +19,8 @@ if [[ $? -gt 0 ]]; then
     exit 1
 fi
 
+export ARCH=~/src/github.com/openstack-k8s-operators/architecture
+
 # identify first ceph deployment secret file
 export CEPH_SECRET_FILE=~/az0_ceph_secret.yaml
 if [[ ! -e $CEPH_SECRET_FILE ]]; then
@@ -32,10 +34,23 @@ if [[ ! -e $CEPH_SECRET_FILE ]]; then
 fi
 
 # identify first control plane CR
-export CONTROL_PLANE_CR_FILE=control-plane-cr.yaml
-# TODO: need a way to genereate this file automatically
+export CONTROL_PLANE_CR_FILE=~/control-plane-cr.yaml
+if [[ ! -e $CONTROL_PLANE_CR_FILE ]]; then
+    echo "CONTROL_PLANE_CR_FILE $CONTROL_PLANE_CR_FILE is missing; copying new one"
+    if [[ ! -e $ARCH/examples/va/hci/dataplane-post-ceph.yaml ]]; then
+	echo "Control Plane CR from first deployment is missing; unable to copy"
+	exit 1
+    else
+	# copy it and ensure only kind OpenStackControlPlane is left
+	# It is called dataplane-post-ceph.yaml, but post-ceph.yaml is a better name
+	python ~/dcn/extra/control_plane_filter.py \
+	       $ARCH/examples/va/hci/dataplane-post-ceph.yaml $CONTROL_PLANE_CR_FILE
+	ls -l $CONTROL_PLANE_CR_FILE
+    fi
+fi
 
-pushd ~/src/github.com/openstack-k8s-operators/architecture
+
+pushd $ARCH
 
 if [ $DATAPLANE -eq 1 ]; then
     SRC=~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-values/values.yaml
