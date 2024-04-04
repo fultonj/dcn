@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+CIFMW=~/src/github.com/openstack-k8s-operators/ci-framework/
+
 if [ "$#" -lt 2 ]; then
     echo "USAGE: $0 <NUM> <CEPH-OVERRIDE-FILE>"
     echo "<NUM> should be 100 for az0, 103 for az1, or 106 for az2"
@@ -10,7 +12,8 @@ fi
 
 START=$1
 
-pushd ~/src/github.com/openstack-k8s-operators/ci-framework/
+pushd $CIFMW
+
 export N=2
 echo -e "localhost ansible_connection=local\n[computes]" > inventory.yml
 for I in $(seq $START $((N+$START))); do
