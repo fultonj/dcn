@@ -68,15 +68,36 @@ def append_to_ceph_conf(src, additions, num):
 
 
 def glance_conf_helper(az0_conf, azn_conf, backend_list):
-    # return multibackend glance INI as string based on parameters
+    # return new multibackend glance INI config as string based on parameters
     new_cfg = configparser.ConfigParser()
-    # add settings used for all backends
-    if 'glance_store' not in new_cfg:
-        new_cfg['glance_store'] = {}
-    new_cfg['glance_store']['stores'] = "http,rbd"
-    new_cfg['glance_store']['os_region_name'] = "regionOne"
-    # The default backend is the first item on backend_list
-    new_cfg['glance_store']['default_backend'] = "az" + str(backend_list[0])
+
+    # Either:
+    #   1. build new [az0] section and append to it
+    # OR
+    #   2. keep existing [az0] section (and others) and append to it
+    # Determine which by examining what is in az0_conf
+    az0_cfg = configparser.ConfigParser()
+    az0_cfg.read_string(az0_conf)
+    have_az0 = False
+    if 'az0' in az0_cfg.sections() and backend_list[0] == 0:
+        # we only want to build on az0...
+        # if it requested first in list (default) and...
+        # if we already have az0
+        have_az0 = True
+
+    if not have_az0:
+        # build new by adding settings used for all backends
+        if 'glance_store' not in new_cfg:
+            new_cfg['glance_store'] = {}
+        new_cfg['glance_store']['stores'] = "http,rbd"
+        new_cfg['glance_store']['os_region_name'] = "regionOne"
+        # The default backend is the first item on backend_list
+        new_cfg['glance_store']['default_backend'] = "az" + str(backend_list[0])
+    else:
+        # set new_cfg to what we have already and then just add azN
+        last = len(backend_list)-1
+        backend_list = [backend_list[last]]
+        new_cfg = az0_cfg
 
     old_cfg = configparser.ConfigParser()
     # add backends based on order of backend_list
@@ -88,16 +109,17 @@ def glance_conf_helper(az0_conf, azn_conf, backend_list):
             old_cfg.read_string(azn_conf)
         if az_n not in new_cfg:
             new_cfg[az_n] = {}
-        for k, v in old_cfg['default_backend'].items():
-            if k != "enabled_backends":
-                if k == "store_description":
-                    # append the AZ to the description for readability
-                    new_cfg[az_n][k] = "\"" + az_n + " " + v.replace('"', '') + "\""
-                elif k == "rbd_store_user":
-                    # append the AZ dot name to the store user?
-                    new_cfg[az_n][k] = az_n + "." + v.replace('"', '')
-                else:
-                    new_cfg[az_n][k] = v
+        if 'default_backend' in old_cfg:
+            for k, v in old_cfg['default_backend'].items():
+                if k != "enabled_backends":
+                    if k == "store_description":
+                        # append the AZ to the description for readability
+                        new_cfg[az_n][k] = "\"" + az_n + " " + v.replace('"', '') + "\""
+                    elif k == "rbd_store_user":
+                        # append the AZ dot name to the store user?
+                        new_cfg[az_n][k] = az_n + "." + v.replace('"', '')
+                    else:
+                        new_cfg[az_n][k] = v
 
     # return new_cfg, but wrap it as a string (str_config)
     str_config = StringIO()
@@ -110,9 +132,9 @@ def set_az0_glance_conf(az0_conf, azn_conf, num):
     # return INI file as a string
     # set az0 as default
     # add azN as nth backend
-    # 
-    # In future it might also keep all azK for 0 < K < N
-    # But for now it only supports two (az0 and azN)
+    # IF az0 already contains K other AZs
+    #   (for azK for 0 < K < N), then keep them
+    #   and append azN
     backend_list = [0, num]
     return glance_conf_helper(az0_conf, azn_conf, backend_list)
 
