@@ -4,6 +4,7 @@
 #    --ceph-secret az0_ceph_secret.yaml --control-plane-cr control-plane-cr.yaml
 
 import argparse
+import base64
 import configparser
 import yaml
 
@@ -56,14 +57,38 @@ def split_sections(filename):
 
 
 def append_to_ceph_conf(src, additions, num):
-    # read src into a dict and return it with additions appended
+    # Read src into a dict and return it with additions appended
+    # Also, update all ceph configuration files to have a [client]
+    # section with 'keyring=/etc/ceph/<name>.client.openstack.keyring'.
+    # This is necessary for openstack rbd clients to know WHICH openstack
+    # keyring to use for each Ceph cluster.
     with open(src, 'r') as src_yaml_file:
         secret = yaml.safe_load(src_yaml_file)
         # append additions to secret['data']
-        for old_file_name, file_value in additions.items():
+        for old_file_name, file_value_64 in additions.items():
             # is it a bug these files always start with ceph?
             file_name = old_file_name.replace("ceph", "az" + str(num))
-            secret['data'][file_name] = file_value
+            secret['data'][file_name] = file_value_64
+
+        # file_names are updated, time to add a keyring line in [client] section
+        for file_name, file_value_64 in secret['data'].items():
+            if file_name == "ceph.conf" or file_name == "az" + str(num) + ".conf":
+                file_value = base64.b64decode(file_value_64)
+                cfg = configparser.ConfigParser()
+                cfg.read_string(file_value.decode('utf-8'))
+                if 'client' not in cfg:
+                    cfg['client'] = {}
+                if 'keyring' not in cfg['client']:
+                    # if there is no keyring set, then set it
+                    cfg['client']['keyring'] = "/etc/ceph/" +\
+                        file_name.replace('.conf', '') +\
+                        ".client.openstack.keyring"
+                str_config = StringIO()
+                cfg.write(str_config)
+                str_config.seek(0)
+                conf_value = str_config.read().encode('utf-8')
+                secret['data'][file_name] = base64.b64encode(conf_value)
+
     return secret
 
 
