@@ -146,6 +146,37 @@ def set_azn_glance_conf(az0_conf, azn_conf, num):
     backend_list = [num, 0]
     return glance_conf_helper(az0_conf, azn_conf, backend_list)
 
+
+def workaround_glance_ceph_conf(add_glance, cinder_config):
+    # kluge.... PR1130 makes ci-framework correctly set ceph_conf
+    # for cinder (and nova) but not for glance. This is a quick
+    # workaround to get a fast POC. I know cinder has the correct
+    # value for any of N AZ deployments, so set glance to use the
+    # same one (make add_glance have the correct value).
+    # Others not affected since they're only using 'ceph' and one AZ
+    # https://github.com/openstack-k8s-operators/ci-framework/pull/1130
+
+    # get a copy cinder's ceph conf (the correct ceph conf)
+    cinder_cp = configparser.ConfigParser()
+    cinder_cp.read_string(cinder_config)
+    ceph_conf = cinder_cp['ceph']['rbd_ceph_conf']
+
+    # get a copy of glance's customServiceConfig
+    glance_config = add_glance['template']['customServiceConfig']
+    glance_cp = configparser.ConfigParser()
+    glance_cp.read_string(glance_config)
+    # set the copy to have the correct ceph conf
+    glance_cp['default_backend']['rbd_store_ceph_conf'] = ceph_conf
+
+    # convert the customServiceConfig back to a string
+    str_config = StringIO()
+    glance_cp.write(str_config)
+    str_config.seek(0)
+    # set add_glance's customServiceConfig to the updated copy
+    add_glance['template']['customServiceConfig'] = str_config.read()
+
+    return add_glance
+
     
 def append_to_control_plane(src, add_cinder, add_glance, num):
     # read src into a dict and return it with cinder and glance appended
@@ -159,6 +190,10 @@ def append_to_control_plane(src, add_cinder, add_glance, num):
         cp['spec']['cinder']['template']['cinderVolumes'][key] = \
             add_cinder['template']['cinderVolumes']['ceph']
         # print(cp['spec']['cinder']['template']['cinderVolumes'])
+
+        # workaround glitch in add_glance source before using
+        add_glance = workaround_glance_ceph_conf(add_glance, \
+            add_cinder['template']['cinderVolumes']['ceph']['customServiceConfig'])
 
         # 2. append add_glance to control plane (cp) glanceAPIs dict but before that...
         # a. Rearrange structure for multiple customServiceConfigs
