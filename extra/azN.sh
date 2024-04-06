@@ -110,6 +110,8 @@ if [ $POSTCEPH -eq 1 ]; then
     kustomize build > post-ceph-azN-temp.yaml
 
     # Modify kustomize output with python to suit DCN scenario for any azN > 0
+    # with post-ceph-azn.py.
+    #
     # For the control plane we want:
     #   - a new glance edge instance with two backends (az0 and azN)
     #   - the default glance to keep using it's current backends but add azN
@@ -124,14 +126,14 @@ if [ $POSTCEPH -eq 1 ]; then
 	   --control-plane-cr $CONTROL_PLANE_CR_FILE
 
     # Apply the single modified post-ceph-azN.yaml file
-    # oc apply -f post-ceph-azN.yaml
+    oc apply -f post-ceph-azN.yaml
 
-    # echo -e "\noc get pods -n openstack -w\n"
-    # oc wait osctlplane controlplane --for condition=Ready --timeout=600s
+    echo -e "\noc get pods -n openstack -w\n"
+    oc wait osctlplane controlplane --for condition=Ready --timeout=600s
 
     # Wait for ansible to finish
-    # echo -e "\noc get pods -w -l app=openstackansibleee\n"
-    # oc wait osdpd $EDPM_POST_CR --for condition=Ready --timeout=1200s
+    echo -e "\noc get pods -w -l app=openstackansibleee\n"
+    oc wait osdpd $EDPM_POST_CR --for condition=Ready --timeout=1200s
     popd
 fi
 
