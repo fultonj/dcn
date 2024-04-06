@@ -111,18 +111,26 @@ def glance_conf_helper(az0_conf, azn_conf, backend_list):
         have_az0 = True
 
     if not have_az0:
-        # build new by adding settings used for all backends
+        # build new by adding universal settings
+        new_cfg['DEFAULT']['enabled_import_methods'] = "[web-download,copy-image]"
+        # use max, because set_az0_glance_conf and set_azn_glance_conf
+        # reverse the order of backend_list but new one should be the max
+        new_cfg['DEFAULT']['enabled_backends'] = "az0:rbd,az" + str(max(backend_list)) + ":rbd"
+
         if 'glance_store' not in new_cfg:
             new_cfg['glance_store'] = {}
         new_cfg['glance_store']['stores'] = "http,rbd"
-        new_cfg['glance_store']['os_region_name'] = "regionOne"
         # The default backend is the first item on backend_list
         new_cfg['glance_store']['default_backend'] = "az" + str(backend_list[0])
     else:
-        # set new_cfg to what we have already and then just add azN
+        # set new_cfg to what we have already
+        new_cfg = az0_cfg
+        # extended the enabled backends list
+        # see "use max" comment above
+        new_cfg['DEFAULT']['enabled_backends'] += ",az" + str(max(backend_list)) + ":rbd"
+        # only add azN
         last = len(backend_list)-1
         backend_list = [backend_list[last]]
-        new_cfg = az0_cfg
 
     old_cfg = configparser.ConfigParser()
     # add backends based on order of backend_list
@@ -140,9 +148,6 @@ def glance_conf_helper(az0_conf, azn_conf, backend_list):
                     if k == "store_description":
                         # append the AZ to the description for readability
                         new_cfg[az_n][k] = "\"" + az_n + " " + v.replace('"', '') + "\""
-                    elif k == "rbd_store_user":
-                        # append the AZ dot name to the store user?
-                        new_cfg[az_n][k] = az_n + "." + v.replace('"', '')
                     else:
                         new_cfg[az_n][k] = v
 
