@@ -112,7 +112,7 @@ def glance_conf_helper(az0_conf, azn_conf, backend_list):
 
     if not have_az0:
         # build new by adding universal settings
-        new_cfg['DEFAULT']['enabled_import_methods'] = "[web-download,copy-image]"
+        new_cfg['DEFAULT']['enabled_import_methods'] = "[web-download,copy-image,glance-direct]"
         # use max, because set_az0_glance_conf and set_azn_glance_conf
         # reverse the order of backend_list but new one should be the max
         new_cfg['DEFAULT']['enabled_backends'] = "az0:rbd,az" + str(max(backend_list)) + ":rbd"
