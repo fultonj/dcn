@@ -207,6 +207,42 @@ def workaround_glance_ceph_conf(add_glance, cinder_config):
 
     return add_glance
 
+
+def add_cinder_az(cfg, az):
+    # return the Cinder INI cfg which was passed as input
+    # but with additional AZ-related settings
+    cinder_cp = configparser.ConfigParser()
+    cinder_cp.read_string(cfg['customServiceConfig'])
+    if 'DEFAULT' not in cinder_cp:
+        cinder_cp['DEFAULT'] = {}
+    cinder_cp['DEFAULT']['storage_availability_zone'] = az
+    cinder_cp['DEFAULT']['default_availability_zone'] = az
+
+    # Relying on convention, confirm with:
+    # `oc describe glance glance | grep 'API Endpoint' -C 2`
+    glance_endpoint = "http://glance-" + az + "-internal.openstack.svc:9292"
+    cinder_cp['DEFAULT']['glance_api_servers'] = glance_endpoint
+
+    # We used this setting in the past, but I assume not anymore
+    # cinder_cp['DEFAULT']['cluster'] = az
+
+    if 'cinder' not in cinder_cp:
+        cinder_cp['cinder'] = {}
+    cinder_cp['cinder']['cross_az_attach'] = 'false'
+
+    cinder_cp['ceph']['rbd_cluster_name'] = az
+    # We used this setting in the past, but I assume not anymore
+    # cinder_cp['ceph']['backend_host']
+
+    # convert the customServiceConfig back to a string
+    str_config = StringIO()
+    cinder_cp.write(str_config)
+    str_config.seek(0)
+    # set cfg's customServiceConfig to the updated copy
+    cfg['customServiceConfig'] = str_config.read()
+
+    return cfg
+
     
 def append_to_control_plane(src, add_cinder, add_glance, num):
     # read src into a dict and return it with cinder and glance appended
@@ -218,7 +254,7 @@ def append_to_control_plane(src, add_cinder, add_glance, num):
 
         # 1. append add_cinder to control plane (cp) cinderVolumes dict
         cp['spec']['cinder']['template']['cinderVolumes'][key] = \
-            add_cinder['template']['cinderVolumes']['ceph']
+            add_cinder_az(add_cinder['template']['cinderVolumes']['ceph'], key)
         # print(cp['spec']['cinder']['template']['cinderVolumes'])
 
         # workaround glitch in add_glance source before using
