@@ -12,6 +12,7 @@ DATAPLANE=0
 CEPH=0
 POSTCEPH=0
 DISCOVER=0
+AGGREGATE=0
 
 # 1 for AZ1 xor 2 for AZ2
 NUM=1
@@ -141,6 +142,19 @@ if [ $DISCOVER -eq 1 ]; then
     oc rsh nova-cell0-conductor-0 nova-manage cell_v2 discover_hosts --verbose
     oc rsh openstackclient openstack compute service list
     oc rsh openstackclient openstack network agent list
+fi
+
+if [ $AGGREGATE -eq 1 ]; then
+    AZ="az${NUM}"
+    echo "# Adding computes $BEG through $END to $AZ"
+    OS="oc rsh openstackclient openstack"
+    $OS aggregate create $AZ
+    $OS aggregate set --zone $AZ $AZ
+    for I in $(seq $BEG $END); do
+        $OS aggregate add host $AZ compute-${I}
+    done
+    $OS compute service list -c Host -c Zone
+    $OS volume service list
 fi
 
 popd
