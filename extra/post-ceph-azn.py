@@ -304,6 +304,37 @@ def append_to_control_plane(src, add_cinder, add_glance, num):
     return cp
 
 
+def add_nova_az(data, num):
+    # Update 03-ceph-nova.conf configmap with DCN config
+    nova_cp = configparser.ConfigParser()
+    nova_cp.read_string(data['data']['03-ceph-nova.conf'])
+
+    nova_cp['libvirt']['images_rbd_glance_store_name'] = "az" + str(num)
+    nova_cp['libvirt']['hw_disk_discard'] = 'unmap'
+    nova_cp['libvirt']['volume_use_multipath'] = 'False'
+
+    if 'glance' not in nova_cp:
+        nova_cp['glance'] = {}
+    # Relying on convention, confirm with:
+    # `oc describe glance glance | grep 'API Endpoint' -C 2`
+    glance_endpoint = "http://glance-az" + str(num) + "-internal.openstack.svc:9292"
+    nova_cp['glance']['endpoint_override'] = glance_endpoint
+    nova_cp['glance']['valid_interfaces'] = 'internal'
+
+    if 'cinder' not in nova_cp:
+        nova_cp['cinder'] = {}
+    nova_cp['cinder']['cross_az_attach'] = 'False'
+    nova_cp['cinder']['catalog_info'] = 'volumev3:cinderv3:internalURL'
+
+    str_config = StringIO()
+    nova_cp.write(str_config)
+    str_config.seek(0)
+    # set 03-ceph-nova.conf to the updated copy
+    data['data']['03-ceph-nova.conf'] = str_config.read()
+
+    return data
+
+
 sections = split_sections(args.src)
 with open(args.dst, 'w') as f:
     for section in sections:
@@ -351,6 +382,9 @@ with open(args.dst, 'w') as f:
                     data['spec']['nodeSets'][0] += "-az" + str(args.num)
                 if data['kind'] == 'OpenStackDataPlaneService':
                     data['spec']['configMaps'][0] += "-az" + str(args.num)
+                if data['kind'] == 'ConfigMap' and \
+                   data['metadata']['name'] == "ceph-nova" + "-az" + str(args.num):
+                    data = add_nova_az(data, args.num)
                 if data['kind'] == 'OpenStackDataPlaneNodeSet':
                     for i in range(0, len(data['spec']['services'])):
                         if data['spec']['services'][i] == "nova-custom-ceph":
