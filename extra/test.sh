@@ -259,7 +259,12 @@ if [ $VM -eq 1 ]; then
     NOVA_ID=$(openstack server show $VM_NAME -f value -c id 2> /dev/null)
     if [[ $? -gt 0 ]]; then
         # CREATE VM
-        openstack server create --flavor c1 --image $IMG_NAME --nic net-id=private $VM_NAME
+        for IMG in $(openstack image list -c ID -f value); do
+            # this loop should only run once, also clean whitespace from the UUID
+            IMG_ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
+        done
+        echo "Creating VM with image $IMG_ID"
+        openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME
         NOVA_ID=$(openstack server show $VM_NAME -f value -c id 2> /dev/null)
     fi
     NOVA_ID=$(echo $NOVA_ID | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
