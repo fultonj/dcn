@@ -98,8 +98,14 @@ if [ $OVERVIEW -eq 1 ]; then
     openstack network agent list
     openstack compute service list
     openstack volume service list
+
     openstack aggregate list
     openstack aggregate show $AZ
+
+    echo "Volume services"
+    openstack volume service list
+    echo "Volume availability zones"
+    openstack availability zone list --volume
 fi
 
 if [ $GLANCE_SANITY -eq 1 ]; then
@@ -264,7 +270,11 @@ if [ $VM -eq 1 ]; then
             IMG_ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         done
         echo "Creating VM with image $IMG_ID"
-        openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME
+        if [ $VM_AZN -eq 1 ]; then
+            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME
+        else
+            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME --availability-zone $AZ
+        fi
         NOVA_ID=$(openstack server show $VM_NAME -f value -c id 2> /dev/null)
     fi
     NOVA_ID=$(echo $NOVA_ID | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
@@ -283,13 +293,10 @@ if [ $CONSOLE -eq 1 ]; then
     openstack console log show $VM_NAME
 fi
 
-if [ $VM_AZN -eq 1 ]; then
-    echo "todo"
-fi
-
 if [ $CEPH_REPORT -eq 1 ]; then
     rceph 0 ceph -s
     rceph $NUM ceph -s
     rceph 0 rbd -p images ls -l
     rceph $NUM rbd -p images ls -l
+
 fi
