@@ -97,13 +97,15 @@ if [ $OVERVIEW -eq 1 ]; then
     openstack endpoint list
     openstack network agent list
     openstack compute service list
-    openstack volume service list
-
     openstack aggregate list
     openstack aggregate show $AZ
 
     echo "Volume services"
     openstack volume service list
+
+    echo "Compute availability zones"
+    openstack availability zone list --compute
+
     echo "Volume availability zones"
     openstack availability zone list --volume
 fi
@@ -214,13 +216,12 @@ if [ $CINDER_AZN -eq 1 ]; then
     sleep 5
     echo "Listing Cinder Ceph Pool and Volume List"
     openstack volume list
-    rceph $NUM rbd -p volumes ls -l
     if [ $VOL_FROM_IMAGE -eq 1 ]; then
         openstack volume show ${VOL_IMG_NAME}-${AZ} -f value -c status
     else
         openstack volume show ${VOL_NAME}-${AZ} -f value -c status
     fi
-    rceph 0 rbd -p volumes ls -l
+    rceph $NUM rbd -p volumes ls -l
 fi
 
 if [ $NOVA_CONTROL_LOGS -eq 1 ]; then
