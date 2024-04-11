@@ -12,6 +12,8 @@ CINDER_DEL=0
 CINDER=0
 VOL_FROM_IMAGE=0
 CINDER_AZN=0
+NOVA_CONTROL_LOGS=0
+NOVA_COMPUTE_LOGS=0
 PRINET=0
 VM_DEL=0
 VM=0
@@ -84,6 +86,12 @@ rceph() {
 
 # -------------------------------------------------------
 # MAIN(s)
+
+export PASS=$(cat ~/.kube/kubeadmin-password)
+oc login -u kubeadmin -p $PASS https://api.ocp.openstack.lab:6443
+if [[ $? -gt 0 ]]; then
+    exit 1
+fi
 
 if [ $OVERVIEW -eq 1 ]; then
     openstack endpoint list
@@ -209,6 +217,22 @@ if [ $CINDER_AZN -eq 1 ]; then
     rceph 0 rbd -p volumes ls -l
 fi
 
+if [ $NOVA_CONTROL_LOGS -eq 1 ]; then
+    oc get pods | grep nova | grep -v controller
+    for POD in $(oc get pods | grep nova | grep -v controller | awk {'print $1'}); do
+        echo $POD
+        echo "~~~"
+        oc logs $POD | grep ERROR | grep -v ERROR_FOR_DIVISION_BY_ZERO
+        echo "~~~"
+    done
+fi
+
+if [ $NOVA_COMPUTE_LOGS -eq 1 ]; then
+    SSH_CMD=$(ssh compute-0)
+    $SSH_CMD "sudo grep ERROR /var/log/containers/nova/nova-compute.log"
+    $SSH_CMD "date"
+fi
+
 if [ $PRINET -eq 1 ]; then
     openstack network create private --share
     openstack subnet create priv_sub --subnet-range 192.168.0.0/24 --network private
@@ -234,12 +258,15 @@ if [ $VM -eq 1 ]; then
     FLAV_ID=$(echo $FLAV_ID | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
     NOVA_ID=$(openstack server show $VM_NAME -f value -c id 2> /dev/null)
     if [[ $? -gt 0 ]]; then
+        # CREATE VM
         openstack server create --flavor c1 --image $IMG_NAME --nic net-id=private $VM_NAME
         NOVA_ID=$(openstack server show $VM_NAME -f value -c id 2> /dev/null)
     fi
     NOVA_ID=$(echo $NOVA_ID | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
     openstack server list
-    if [[ $(openstack server list -c Status -f value) == "BUILD" ]]; then
+    if [[ $(openstack server list -c Status -f value \
+                | while IFS= read -r line; do echo -n "$line"; done \
+                | tr -d '[:space:]') == "BUILD" ]]; then
         echo "Waiting one 30 seconds for building server to boot"
         sleep 30
     fi
