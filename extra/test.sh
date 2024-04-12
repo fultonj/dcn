@@ -235,7 +235,10 @@ if [ $NOVA_CONTROL_LOGS -eq 1 ]; then
 fi
 
 if [ $NOVA_COMPUTE_LOGS -eq 1 ]; then
-    SSH_CMD=$(ssh compute-0)
+    NODE="compute-0"
+    # NODE="compute-$BEG"
+    SSH_CMD="ssh $SSH_OPT $NODE"
+    $SSH_CMD "hostname"
     $SSH_CMD "sudo grep ERROR /var/log/containers/nova/nova-compute.log"
     $SSH_CMD "date"
 fi
