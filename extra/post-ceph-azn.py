@@ -177,6 +177,23 @@ def set_azn_glance_conf(az0_conf, azn_conf, num):
     return glance_conf_helper(az0_conf, azn_conf, backend_list)
 
 
+def get_next_lb_ip(over, num):
+    # az0 has the default metallb IP
+    # we're adding azN which kustomize will have set to the same IP.
+    # So we need to set a different IP from the ipaddresspool as per:
+    #   'oc get ipaddresspool -n metallb-system'
+    # which is not in use as per:
+    #   'oc get ipaddresspool -n metallb-system'
+    # For now I'll just assume num makes it unique enough
+    ip = over['service']['internal']['metadata']['annotations']\
+          ['metallb.universe.tf/loadBalancerIPs']
+    octets = ip.split('.')
+    octets[3] = str(int(octets[3]) + num)
+    over['service']['internal']['metadata']['annotations']['metallb.universe.tf/loadBalancerIPs'] = '.'.join(octets)
+
+    return over
+
+
 def workaround_glance_ceph_conf(add_glance, cinder_config):
     # kluge.... PR1130 makes ci-framework correctly set ceph_conf
     # for cinder (and nova) but not for glance. This is a quick
@@ -271,11 +288,9 @@ def append_to_control_plane(src, add_cinder, add_glance, num):
             set_azn_glance_conf(az0_glance_conf, azn_glance_conf, num)
         del(cp['spec']['glance']['template']['customServiceConfig'])
 
-        # b. Move overrides to the main glance tree
-        override = cp['spec']['glance']['template']['glanceAPIs']['default']['override']
-        cp['spec']['glance']['template']['override'] = override
-        del(cp['spec']['glance']['template']['glanceAPIs']['default']['override'])
-        del(add_glance['template']['glanceAPIs']['default']['override'])
+        # b. keep glance overrides per service but increment azN's LB IP
+        add_glance['template']['glanceAPIs']['default']['override'] =\
+            get_next_lb_ip(add_glance['template']['glanceAPIs']['default']['override'], num)
 
         # c. Add items to az0 glance
         cp['spec']['glance']['template']['glanceAPIs']['default']['type'] = 'split'
