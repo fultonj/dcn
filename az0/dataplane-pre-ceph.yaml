@@ -48,10 +48,6 @@ spec:
         - ceph_mon
         - ceph_mgr
         - ceph_osd
-        - ceph_rgw
-        - ceph_nfs
-        - ceph_rgw_frontend
-        - ceph_nfs_frontend
         edpm_iscsid_image: '{{ registry_url }}/openstack-iscsid:{{ image_tag }}'
         edpm_logrotate_crond_image: '{{ registry_url }}/openstack-cron:{{ image_tag
           }}'
