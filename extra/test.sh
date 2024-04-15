@@ -275,9 +275,9 @@ if [ $VM -eq 1 ]; then
         done
         echo "Creating VM with image $IMG_ID"
         if [ $VM_AZN -eq 1 ]; then
-            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME
+            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME-$AZ --availability-zone $AZ
         else
-            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME --availability-zone $AZ
+            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME
         fi
         NOVA_ID=$(openstack server show $VM_NAME -f value -c id 2> /dev/null)
     fi
@@ -290,7 +290,11 @@ if [ $VM -eq 1 ]; then
         sleep 30
     fi
     openstack server list
-    rceph 0 rbd -p vms ls -l
+    if [ $VM_AZN -eq 1 ]; then
+        rceph $NUM rbd -p vms ls -l
+    else
+        rceph 0 rbd -p vms ls -l
+    fi
 fi
 
 if [ $CONSOLE -eq 1 ]; then
