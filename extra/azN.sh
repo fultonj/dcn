@@ -10,8 +10,8 @@
 
 DATAPLANE=0
 CEPH=0
-POSTCEPH=0
 DNSHACK=0
+POSTCEPH=0
 DISCOVER=0
 AGGREGATE=0
 
@@ -173,7 +173,7 @@ if [ $AGGREGATE -eq 1 ]; then
     $OS aggregate create $AZ
     $OS aggregate set --zone $AZ $AZ
     for I in $(seq $BEG $END); do
-        $OS aggregate add host $AZ compute-${I}
+        $OS aggregate add host $AZ compute-${I}.ctlplane.example.com
     done
     $OS compute service list -c Host -c Zone
     $OS volume service list
