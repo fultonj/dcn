@@ -339,6 +339,8 @@ fi
 if [ $CEPH_REPORT -eq 1 ]; then
     rceph 0 ceph -s
     rceph $NUM ceph -s
-    rceph 0 rbd -p images ls -l
-    rceph $NUM rbd -p images ls -l
+    for POOL in images volumes vms; do
+        rceph 0 rbd -p $POOL ls -l
+        rceph $NUM rbd -p $POOL ls -l
+    done
 fi
