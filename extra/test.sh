@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Import an image into the default and AZn locations
-# Boot an instance and create a volume in the default location
-# Boot an instance and create a volume in the AZn location
+# Boot an instance from a volume in the default or AZn location
+# Copy a snapshot of the VM from the default location to AZn
 # -------------------------------------------------------
 # VARS
 OCP_AUTH=0
@@ -23,6 +23,7 @@ VM=0
 CONSOLE=0
 VM_AZN=0
 PET=0
+SNAP_MV=0
 CEPH_REPORT=0
 
 # Set "n"
@@ -190,6 +191,13 @@ fi
 if [ $CINDER_DEL -eq 1 ]; then
     echo "Ensuring there are no Cinder volumes"
     openstack volume list
+    echo "If there are snapshots they need to be deleted first)"
+    openstack volume snapshot list
+    for IMG in $(SHOW_CMD=0 openstack volume snapshot list -c ID -f value); do
+        # had issue with new lines, so cleaning
+        ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
+        openstack volume snapshot delete $ID
+    done
     for IMG in $(SHOW_CMD=0 openstack volume list -c ID -f value); do
         # had issue with new lines, so cleaning
         ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
@@ -334,6 +342,24 @@ fi
 
 if [ $CONSOLE -eq 1 ]; then
     openstack console log show $VM_NAME
+fi
+
+if [ $SNAP_MV -eq 1 ]; then
+    # Create a new image on AZn containing a snapshot of
+    # the instance created in the previous section.
+    openstack server image create --name cirros-snapshot vm1-pet
+    sleep 5
+    openstack image list
+    openstack volume snapshot list
+    # identify the new image
+    IMG=$(SHOW_CMD=0 openstack image show cirros-snapshot -f value -c id)
+    IMG_ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
+    openstack volume snapshot list
+    openstack image show $IMG_ID | grep stores
+    # Copy the image from AZn site to the default site
+    echo "copying image to az1 store"
+    glance image-import $IMG_ID --stores az1 --import-method copy-image
+    openstack image show $IMG_ID | grep stores
 fi
 
 if [ $CEPH_REPORT -eq 1 ]; then
