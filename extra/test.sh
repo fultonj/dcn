@@ -4,6 +4,9 @@
 # Boot an instance and create a volume in the AZn location
 # -------------------------------------------------------
 # VARS
+OCP_AUTH=0
+SHOW_CMD=1
+
 OVERVIEW=0
 GLANCE_SANITY=0
 GLANCE_DEL=0
@@ -30,19 +33,20 @@ AZ="az${NUM}"
 
 if [ $NUM -eq 1 ]; then
     BEG=3
-    END=5
 fi
 if [ $NUM -eq 2 ]; then
     BEG=6
-    END=8
 fi
 
 CIR=cirros-0.5.2-x86_64-disk.img
 CIR_URL=http://download.cirros-cloud.net/0.5.2/$CIR
 IMG_NAME=cirros
 VOL_NAME=vol1
-VM_NAME=vm1
 VOL_IMG_NAME="${VOL_NAME}-${IMG_NAME}"
+VM_NAME=vm1
+if [ $VM_AZN -eq 1 ]; then
+    VM_NAME=$VM_NAME-$AZ
+fi
 
 SSH_OPT="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
@@ -51,14 +55,30 @@ SSH_OPT="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel
 
 openstack() {
     # Run openstack command inside openstackclient pod
+    if [ $SHOW_CMD -eq 1 ]; then
+        echo ""
+        echo "$ openstack $@"
+    fi
     oc rsh -t --shell='/bin/sh' openstackclient openstack $@
+    if [ $SHOW_CMD -eq 1 ]; then
+        echo "$"
+        echo ""
+    fi
 }
 
 glance() {
     # Run glance command inside openstackclient pod
     # From opentsackclient pod's `.config/openstack/clouds.yaml`
+    if [ $SHOW_CMD -eq 1 ]; then
+        echo ""
+        echo "$ glance $@"
+    fi
     END=https://keystone-public-openstack.apps.ocp.openstack.lab
     oc rsh -t --shell='/bin/sh' openstackclient glance --os-auth-url $END --os-project-name admin --os-username admin --os-password 12345678 --os-user-domain-name default --os-project-domain-name default $@
+    if [ $SHOW_CMD -eq 1 ]; then
+        echo "$"
+        echo ""
+    fi
 }
 
 rceph() {
@@ -87,10 +107,12 @@ rceph() {
 # -------------------------------------------------------
 # MAIN(s)
 
-export PASS=$(cat ~/.kube/kubeadmin-password)
-oc login -u kubeadmin -p $PASS https://api.ocp.openstack.lab:6443
-if [[ $? -gt 0 ]]; then
-    exit 1
+if [ $OCP_AUTH -eq 1 ]; then
+    export PASS=$(cat ~/.kube/kubeadmin-password)
+    oc login -u kubeadmin -p $PASS https://api.ocp.openstack.lab:6443
+    if [[ $? -gt 0 ]]; then
+        exit 1
+    fi
 fi
 
 if [ $OVERVIEW -eq 1 ]; then
@@ -111,12 +133,6 @@ if [ $OVERVIEW -eq 1 ]; then
 fi
 
 if [ $GLANCE_SANITY -eq 1 ]; then
-    GLANCE_ENDPOINT=$(openstack endpoint list -f value -c "Service Name" -c "Interface" -c "URL" | grep glance | grep public | awk {'print $3'})
-    if [[ $(curl -s $GLANCE_ENDPOINT | grep Unavailable | wc -l) -gt 0 ]]; then
-        echo "curl $GLANCE_ENDPOINT returns unavailable (glance broken?)"
-        curl -s $GLANCE_ENDPOINT
-        exit 1
-    fi
     glance image-list
     if [[ $? -gt 0 ]]; then
         echo "Aborting. Not even 'glance image-list' works."
@@ -127,7 +143,7 @@ fi
 if [ $GLANCE_DEL -eq 1 ]; then
     echo "Ensuring there are no Glance images"
     glance image-list
-    for IMG in $(openstack image list -c ID -f value); do
+    for IMG in $(SHOW_CMD=0 openstack image list -c ID -f value); do
         # had issue with new lines, so cleaning
         ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         openstack image delete $ID
@@ -150,7 +166,7 @@ if [ $MULTI_GLANCE -eq 1 ]; then
            --name $IMG_NAME \
            --file $CIR \
            --store az0
-    for IMG in $(openstack image list -c ID -f value); do
+    for IMG in $(SHOW_CMD=0 openstack image list -c ID -f value); do
         # this loop should only run once, also clean whitespace from the UUID
         ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         echo "$CIR should only be on AZ0"
@@ -167,7 +183,7 @@ fi
 if [ $CINDER_DEL -eq 1 ]; then
     echo "Ensuring there are no Cinder volumes"
     openstack volume list
-    for IMG in $(openstack volume list -c ID -f value); do
+    for IMG in $(SHOW_CMD=0 openstack volume list -c ID -f value); do
         # had issue with new lines, so cleaning
         ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         openstack volume delete $ID
@@ -182,7 +198,7 @@ if [ $CINDER -eq 1 ]; then
     openstack volume list
     if [ $VOL_FROM_IMAGE -eq 1 ]; then
         echo "Creating 8 GB Cinder volume from $IMG_NAME"
-        for IMG in $(openstack image list -c ID -f value); do
+        for IMG in $(SHOW_CMD=0 openstack image list -c ID -f value); do
             # this loop should only run once, also clean whitespace from the UUID
             ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         done
@@ -204,7 +220,7 @@ if [ $CINDER_AZN -eq 1 ]; then
     openstack volume list
     if [ $VOL_FROM_IMAGE -eq 1 ]; then
         echo "Creating 8 GB Cinder volume from $IMG_NAME"
-        for IMG in $(openstack image list -c ID -f value); do
+        for IMG in $(SHOW_CMD=0 openstack image list -c ID -f value); do
             # this loop should only run once, also clean whitespace from the UUID
             ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         done
@@ -251,7 +267,7 @@ fi
 if [ $VM_DEL -eq 1 ]; then
     echo "Ensuring there are no Nova VMs"
     openstack server list
-    for IMG in $(openstack server list -c ID -f value); do
+    for IMG in $(SHOW_CMD=0 openstack server list -c ID -f value); do
         # had issue with new lines, so cleaning
         ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         openstack server delete $ID
@@ -260,30 +276,32 @@ if [ $VM_DEL -eq 1 ]; then
 fi
 
 if [ $VM -eq 1 ]; then
-    FLAV_ID=$(openstack flavor show c1 -f value -c id 2> /dev/null)
+    FLAV_ID=$(SHOW_CMD=0 openstack flavor show c1 -f value -c id 2> /dev/null)
     if [[ $? -gt 0 ]]; then
         openstack flavor create c1 --vcpus 1 --ram 256
-        FLAV_ID=$(openstack flavor show c1 -f value -c id 2> /dev/null)
+        FLAV_ID=$(SHOW_CMD=0 openstack flavor show c1 -f value -c id 2> /dev/null)
     fi
     FLAV_ID=$(echo $FLAV_ID | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
-    NOVA_ID=$(openstack server show $VM_NAME -f value -c id 2> /dev/null)
+    NOVA_ID=$(SHOW_CMD=0 openstack server show $VM_NAME -f value -c id 2> /dev/null)
     if [[ $? -gt 0 ]]; then
         # CREATE VM
-        for IMG in $(openstack image list -c ID -f value); do
+        for IMG in $(SHOW_CMD=0 openstack image list -c ID -f value); do
             # this loop should only run once, also clean whitespace from the UUID
             IMG_ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         done
         echo "Creating VM with image $IMG_ID"
         if [ $VM_AZN -eq 1 ]; then
-            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME-$AZ --availability-zone $AZ
+            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME --availability-zone $AZ
         else
             openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME
         fi
-        NOVA_ID=$(openstack server show $VM_NAME -f value -c id 2> /dev/null)
+        NOVA_ID=$(SHOW_CMD=0 openstack server show $VM_NAME -f value -c id 2> /dev/null)
+    else
+        echo "$NOVA_ID"
     fi
     NOVA_ID=$(echo $NOVA_ID | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
     openstack server list
-    if [[ $(openstack server list -c Status -f value \
+    if [[ $(SHOW_CMD=0 openstack server list -c Status -f value \
                 | while IFS= read -r line; do echo -n "$line"; done \
                 | tr -d '[:space:]') == "BUILD" ]]; then
         echo "Waiting one 30 seconds for building server to boot"
@@ -306,5 +324,4 @@ if [ $CEPH_REPORT -eq 1 ]; then
     rceph $NUM ceph -s
     rceph 0 rbd -p images ls -l
     rceph $NUM rbd -p images ls -l
-
 fi
