@@ -23,7 +23,6 @@ VM=0
 CONSOLE=0
 VM_AZN=0
 PET=0
-PET_AZN=0
 CEPH_REPORT=0
 
 # Set "n"
@@ -51,6 +50,9 @@ fi
 if [ $CINDER_AZN -eq 1 ]; then
     VOL_NAME=$VOL_NAME-$AZ
     VOL_IMG_NAME=$VOL_IMG_NAME-$AZ
+fi
+if [ $PET -eq 1 ]; then
+    VM_NAME=$VM_NAME-pet
 fi
 
 SSH_OPT="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
@@ -280,18 +282,32 @@ if [ $VM -eq 1 ]; then
         FLAV_ID=$(SHOW_CMD=0 openstack flavor show c1 -f value -c id 2> /dev/null)
     fi
     FLAV_ID=$(echo $FLAV_ID | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
-    NOVA_ID=$(SHOW_CMD=0 openstack server show $VM_NAME -f value -c id 2> /dev/null)
-    if [[ $? -gt 0 ]]; then
-        # CREATE VM
-        for IMG in $(SHOW_CMD=0 openstack image list -c ID -f value); do
-            # this loop should only run once, also clean whitespace from the UUID
-            IMG_ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
-        done
-        echo "Creating VM with image $IMG_ID"
+    if [[ $? -eq 0 ]]; then
+        echo "Attempting to create $VM_NAME"
+        if [ $PET -eq 0 ]; then
+            for IMG in $(SHOW_CMD=0 openstack image list -c ID -f value); do
+                # this loop should only run once, also clean whitespace from the UUID
+                IMG_ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
+            done
+            IMG_SRC="--image $IMG_ID"
+        fi
+        if [ $PET -eq 1 ]; then
+            echo "Looking for volume \"$VOL_IMG_NAME\""
+            VOL=$(SHOW_CMD=0 openstack volume show $VOL_IMG_NAME -c id -f value 2> /dev/null)
+            VOL_ID=$(echo $VOL | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
+            # did we get a UUID?
+            if [[ $VOL_ID =~ ^\{?[A-F0-9a-f]{8}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{12}\}?$ ]]; then
+                IMG_SRC="--volume $VOL_ID"
+            else
+                echo "Error: please create volume \"$VOL_IMG_NAME\" first."
+                exit 1
+            fi
+        fi
+        echo "Creating VM with $IMG_SRC"
         if [ $VM_AZN -eq 1 ]; then
-            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME --availability-zone $AZ
+            openstack server create --flavor c1 $IMG_SRC --nic net-id=private $VM_NAME --availability-zone $AZ
         else
-            openstack server create --flavor c1 --image $IMG_ID --nic net-id=private $VM_NAME
+            openstack server create --flavor c1 $IMG_SRC --nic net-id=private $VM_NAME
         fi
         NOVA_ID=$(SHOW_CMD=0 openstack server show $VM_NAME -f value -c id 2> /dev/null)
     else
@@ -310,6 +326,9 @@ if [ $VM -eq 1 ]; then
         rceph $NUM rbd -p vms ls -l
     else
         rceph 0 rbd -p vms ls -l
+    fi
+    if [ $PET -eq 1 ]; then
+        openstack volume list
     fi
 fi
 
