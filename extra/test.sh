@@ -44,8 +44,13 @@ IMG_NAME=cirros
 VOL_NAME=vol1
 VOL_IMG_NAME="${VOL_NAME}-${IMG_NAME}"
 VM_NAME=vm1
+
 if [ $VM_AZN -eq 1 ]; then
     VM_NAME=$VM_NAME-$AZ
+fi
+if [ $CINDER_AZN -eq 1 ]; then
+    VOL_NAME=$VOL_NAME-$AZ
+    VOL_IMG_NAME=$VOL_IMG_NAME-$AZ
 fi
 
 SSH_OPT="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
@@ -192,9 +197,17 @@ if [ $CINDER_DEL -eq 1 ]; then
 fi
 
 if [ $CINDER -eq 1 ]; then
-    echo "DEFAULT"
+    if [ $CINDER_AZN -eq 1 ]; then
+        echo "$AZ"
+    else
+        echo "DEFAULT"
+    fi
     echo " --------- Ceph cinder volumes pool --------- "
-    rceph 0 rbd -p volumes ls -l
+    if [ $CINDER_AZN -eq 1 ]; then
+        rceph $NUM rbd -p volumes ls -l
+    else
+        rceph 0 rbd -p volumes ls -l
+    fi
     openstack volume list
     if [ $VOL_FROM_IMAGE -eq 1 ]; then
         echo "Creating 8 GB Cinder volume from $IMG_NAME"
@@ -202,42 +215,27 @@ if [ $CINDER -eq 1 ]; then
             # this loop should only run once, also clean whitespace from the UUID
             ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
         done
-        openstack volume create --size 8 $VOL_IMG_NAME --image $ID
+        if [ $CINDER_AZN -eq 1 ]; then
+            openstack volume create --size 8 $VOL_IMG_NAME --image $ID --availability-zone $AZ
+        else
+            openstack volume create --size 8 $VOL_IMG_NAME --image $ID
+        fi
     else
         echo "Creating empty 1 GB Cinder volume"
-        openstack volume create --size 1 $VOL_NAME-default
+        if [ $CINDER_AZN -eq 1 ]; then
+            openstack volume create --size 1 $VOL_NAME --availability-zone $AZ
+        else
+            openstack volume create --size 1 $VOL_NAME
+        fi
     fi
     sleep 5
     echo "Listing Cinder Ceph Pool and Volume List"
     openstack volume list
-    rceph 0 rbd -p volumes ls -l
-fi
-
-if [ $CINDER_AZN -eq 1 ]; then
-    echo "$AZ"
-    echo " --------- Ceph cinder volumes pool --------- "
-    rceph $NUM rbd -p volumes ls -l
-    openstack volume list
-    if [ $VOL_FROM_IMAGE -eq 1 ]; then
-        echo "Creating 8 GB Cinder volume from $IMG_NAME"
-        for IMG in $(SHOW_CMD=0 openstack image list -c ID -f value); do
-            # this loop should only run once, also clean whitespace from the UUID
-            ID=$(echo $IMG | while IFS= read -r line; do echo -n "$line"; done | tr -d '[:space:]')
-        done
-        openstack volume create --size 8 --availability-zone $AZ ${VOL_IMG_NAME}-${AZ} --image $ID
+    if [ $CINDER_AZN -eq 1 ]; then
+        rceph $NUM rbd -p volumes ls -l
     else
-        echo "Creating empty 1 GB Cinder volume"
-        openstack volume create --size 1 --availability-zone $AZ ${VOL_NAME}-${AZ}
+        rceph 0 rbd -p volumes ls -l
     fi
-    sleep 5
-    echo "Listing Cinder Ceph Pool and Volume List"
-    openstack volume list
-    if [ $VOL_FROM_IMAGE -eq 1 ]; then
-        openstack volume show ${VOL_IMG_NAME}-${AZ} -f value -c status
-    else
-        openstack volume show ${VOL_NAME}-${AZ} -f value -c status
-    fi
-    rceph $NUM rbd -p volumes ls -l
 fi
 
 if [ $NOVA_CONTROL_LOGS -eq 1 ]; then
