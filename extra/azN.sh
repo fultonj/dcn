@@ -18,6 +18,10 @@ AGGREGATE=0
 # 1 for AZ1 xor 2 for AZ2
 NUM=1
 
+APPLY=1
+BACKUP=/tmp/dcn/az${NUM}
+mkdir -p $BACKUP
+
 if [ $NUM -eq 1 ]; then
     BEG=3
     END=5
@@ -87,8 +91,12 @@ if [ $DATAPLANE -eq 1 ]; then
     kustomize build edpm-pre-ceph > dataplane-pre-ceph-azN-temp.yaml
     # change the name to include azN and exclude secrets
     python ~/dcn/extra/nodeset_name.py dataplane-pre-ceph-azN-temp.yaml dataplane-pre-ceph-azN.yaml --num $NUM
-    oc create -f dataplane-pre-ceph-azN.yaml
-    oc wait osdpd $EDPM_PRE_CR --for condition=Ready --timeout=1200s
+
+    cp -v dataplane-pre-ceph-azN.yaml $BACKUP/dataplane-pre-ceph-az${NUM}.yaml
+    if [ $APPLY -eq 1 ]; then
+        oc apply -f dataplane-pre-ceph-azN.yaml
+        oc wait osdpd $EDPM_PRE_CR --for condition=Ready --timeout=1200s
+    fi
     popd
 fi
 
@@ -148,15 +156,19 @@ if [ $POSTCEPH -eq 1 ]; then
 	   --ceph-secret $CEPH_SECRET_FILE \
 	   --control-plane-cr $CONTROL_PLANE_CR_FILE
 
+    cp -v post-ceph-azN.yaml $BACKUP/post-ceph-az${NUM}.yaml
+
     # Apply the single modified post-ceph-azN.yaml file
-    oc apply -f post-ceph-azN.yaml
+    if [ $APPLY -eq 1 ]; then
+        oc apply -f post-ceph-azN.yaml
 
-    echo -e "\noc get pods -n openstack -w\n"
-    oc wait osctlplane controlplane --for condition=Ready --timeout=600s
+        echo -e "\noc get pods -n openstack -w\n"
+        oc wait osctlplane controlplane --for condition=Ready --timeout=600s
 
-    # Wait for ansible to finish
-    echo -e "\noc get pods -w -l app=openstackansibleee\n"
-    oc wait osdpd $EDPM_POST_CR --for condition=Ready --timeout=1200s
+        # Wait for ansible to finish
+        echo -e "\noc get pods -w -l app=openstackansibleee\n"
+        oc wait osdpd $EDPM_POST_CR --for condition=Ready --timeout=1200s
+    fi
     popd
 fi
 
