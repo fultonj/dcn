@@ -22,6 +22,12 @@ DISCOVER=0
 APPLY=1
 mkdir -p /tmp/dcn/az0
 
+for F in yq kustomize; do
+    if [[ ! -e ~/bin/$F ]]; then
+        echo "Aborting: $F is not in ~/bin/$F"
+        exit 1
+    fi
+done
 export PASS=$(cat ~/.kube/kubeadmin-password)
 oc login -u kubeadmin -p $PASS https://api.ocp.openstack.lab:6443
 if [[ $? -gt 0 ]]; then
