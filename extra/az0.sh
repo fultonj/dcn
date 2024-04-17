@@ -19,6 +19,9 @@ DNSHACK=0
 POSTCEPH=0
 DISCOVER=0
 
+APPLY=1
+mkdir -p /tmp/dcn/az0
+
 export PASS=$(cat ~/.kube/kubeadmin-password)
 oc login -u kubeadmin -p $PASS https://api.ocp.openstack.lab:6443
 if [[ $? -gt 0 ]]; then
@@ -90,13 +93,16 @@ if [ $CONTROLPLANE -eq 1 ]; then
     kustomize build control-plane/nncp > nncp.yaml
     kustomize build control-plane > control-plane.yaml
 
-    oc apply -f nncp.yaml
-    oc wait nncp -l osp/nncm-config-type=standard --for jsonpath='{.status.conditions[0].reason}'=SuccessfullyConfigured --timeout=300s
+    cp -v control-plane.yaml /tmp/dcn/az0
+    if [ $APPLY -eq 1 ]; then
+        oc apply -f nncp.yaml
+        oc wait nncp -l osp/nncm-config-type=standard --for jsonpath='{.status.conditions[0].reason}'=SuccessfullyConfigured --timeout=300s
 
-    sleep 5
-    oc apply -f control-plane.yaml
-    sleep 5
-    oc wait osctlplane controlplane --for condition=Ready --timeout=600s
+        sleep 5
+        oc apply -f control-plane.yaml
+        sleep 5
+        oc wait osctlplane controlplane --for condition=Ready --timeout=600s
+    fi
 
     popd
 fi
@@ -112,8 +118,11 @@ if [ $DATAPLANE -eq 1 ]; then
     pushd examples/va/hci/
     python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/values.yaml --beg 0 --end 2
     kustomize build edpm-pre-ceph > dataplane-pre-ceph.yaml
-    oc create -f dataplane-pre-ceph.yaml
-    oc wait osdpd edpm-deployment-pre-ceph --for condition=Ready --timeout=1200s
+    cp -v dataplane-pre-ceph.yaml /tmp/dcn/az0
+    if [ $APPLY -eq 1 ]; then
+        oc apply -f dataplane-pre-ceph.yaml
+        oc wait osdpd edpm-deployment-pre-ceph --for condition=Ready --timeout=1200s
+    fi
     popd
 fi
 
@@ -164,14 +173,16 @@ if [ $POSTCEPH -eq 1 ]; then
         exit 1
     fi
 
-    oc apply -f post-ceph.yaml
+    cp -v post-ceph.yaml /tmp/dcn/az0
+    if [ $APPLY -eq 1 ]; then
+        oc apply -f post-ceph.yaml
 
-    echo -e "\noc get pods -n openstack -w\n"
-    echo -e "\noc get pods -w -l app=openstackansibleee\n"
+        echo -e "\noc get pods -n openstack -w\n"
+        echo -e "\noc get pods -w -l app=openstackansibleee\n"
 
-    oc wait osctlplane controlplane --for condition=Ready --timeout=600s
-    oc wait osdpd edpm-deployment-post-ceph --for condition=Ready --timeout=1200s
-
+        oc wait osctlplane controlplane --for condition=Ready --timeout=600s
+        oc wait osdpd edpm-deployment-post-ceph --for condition=Ready --timeout=1200s
+    fi
     popd
 fi
 
