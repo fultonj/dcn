@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 data:
   authorized_keys: <redacted>
@@ -48,23 +49,29 @@ spec:
         - ceph_mon
         - ceph_mgr
         - ceph_osd
+        - ceph_rgw
+        - ceph_nfs
+        - ceph_rgw_frontend
+        - ceph_nfs_frontend
+        edpm_fips_mode: check
         edpm_iscsid_image: '{{ registry_url }}/openstack-iscsid:{{ image_tag }}'
         edpm_logrotate_crond_image: '{{ registry_url }}/openstack-cron:{{ image_tag
           }}'
         edpm_network_config_hide_sensitive_logs: false
         edpm_network_config_os_net_config_mappings:
-          edpm-compute:
-            nic2: eth1
           edpm-compute-0:
-            nic2: 6a:fe:54:3f:8a:02
+            nic1: 52:54:00:1e:af:6b
+            nic2: 52:54:00:d9:cb:f4
           edpm-compute-1:
-            nic2: 6b:fe:54:3f:8a:02
+            nic1: 52:54:00:f2:bc:af
+            nic2: 52:54:00:f1:c7:dd
           edpm-compute-2:
-            nic2: 6c:fe:54:3f:8a:02
+            nic1: 52:54:00:dd:33:14
+            nic2: 52:54:00:50:fb:c3
         edpm_network_config_template: |
           ---
           {% set mtu_list = [ctlplane_mtu] %}
-          {% for network in role_networks %}
+          {% for network in nodeset_networks %}
           {{ mtu_list.append(lookup('vars', networks_lower[network] ~ '_mtu')) }}
           {%- endfor %}
           {% set min_viable_mtu = mtu_list | max %}
@@ -84,7 +91,7 @@ spec:
               mtu: {{ min_viable_mtu }}
               # force the MAC address of the bridge to this interface
               primary: true
-          {% for network in role_networks %}
+          {% for network in nodeset_networks %}
             - type: vlan
               mtu: {{ lookup('vars', networks_lower[network] ~ '_mtu') }}
               vlan_id: {{ lookup('vars', networks_lower[network] ~ '_vlan_id') }}
@@ -128,15 +135,13 @@ spec:
     managementNetwork: ctlplane
     networks:
     - defaultRoute: true
-      name: CtlPlane
+      name: ctlplane
       subnetName: subnet1
-    - name: InternalApi
+    - name: internalapi
       subnetName: subnet1
-    - name: Storage
+    - name: storage
       subnetName: subnet1
-    - name: Tenant
-      subnetName: subnet1
-    - name: StorageMgmt
+    - name: tenant
       subnetName: subnet1
   nodes:
     edpm-compute-0:
@@ -199,3 +204,4 @@ spec:
   - ceph-hci-pre
   - configure-os
   - run-os
+  - reboot-os

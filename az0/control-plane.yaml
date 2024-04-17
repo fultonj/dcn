@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 data:
   AdminPassword: <redacted>
@@ -20,7 +21,7 @@ data:
   KeystoneDatabasePassword: <redacted>
   ManilaDatabasePassword: <redacted>
   ManilaPassword: <redacted>
-  MetadataSecret: MTIzNDU2Nzg0Mg==
+  MetadataSecret: <redacted>
   NeutronDatabasePassword: <redacted>
   NeutronPassword: <redacted>
   NovaAPIDatabasePassword: <redacted>
@@ -570,7 +571,7 @@ spec:
   networks:
   - dnsDomain: ctlplane.example.com
     mtu: 1500
-    name: CtlPlane
+    name: ctlplane
     subnets:
     - allocationRanges:
       - end: 192.168.122.120
@@ -582,7 +583,7 @@ spec:
       name: subnet1
   - dnsDomain: internalapi.example.com
     mtu: 1496
-    name: InternalApi
+    name: internalapi
     subnets:
     - allocationRanges:
       - end: 172.17.0.250
@@ -592,7 +593,7 @@ spec:
       vlan: 20
   - dnsDomain: external.example.com
     mtu: 1500
-    name: External
+    name: external
     subnets:
     - allocationRanges:
       - end: 10.0.0.250
@@ -602,7 +603,7 @@ spec:
       vlan: 22
   - dnsDomain: storage.example.com
     mtu: 1496
-    name: Storage
+    name: storage
     subnets:
     - allocationRanges:
       - end: 172.18.0.250
@@ -612,7 +613,7 @@ spec:
       vlan: 21
   - dnsDomain: tenant.example.com
     mtu: 1496
-    name: Tenant
+    name: tenant
     subnets:
     - allocationRanges:
       - end: 172.19.0.250
@@ -622,7 +623,7 @@ spec:
       vlan: 22
   - dnsDomain: storagemgmt.example.com
     mtu: 1500
-    name: StorageMgmt
+    name: storagemgmt
     subnets:
     - allocationRanges:
       - end: 172.20.0.250

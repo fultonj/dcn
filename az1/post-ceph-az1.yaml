@@ -1,89 +1,58 @@
 ---
 apiVersion: v1
 data:
-  03-ceph-nova.conf: |-
-    [libvirt]
-    images_type=rbd
-    images_rbd_pool=vms
-    images_rbd_ceph_conf=/etc/ceph/ceph.conf
-    images_rbd_glance_store_name=default_backend
-    images_rbd_glance_copy_poll_interval=15
-    images_rbd_glance_copy_timeout=600
-    rbd_user=openstack
-    rbd_secret_uuid=e9fd4d44-2dbb-5dc8-95f2-4fcf8da7121c
+  03-ceph-nova.conf: '[libvirt]
+
+    images_type = rbd
+
+    images_rbd_pool = vms
+
+    images_rbd_ceph_conf = /etc/ceph/az1.conf
+
+    images_rbd_glance_store_name = az1
+
+    images_rbd_glance_copy_poll_interval = 15
+
+    images_rbd_glance_copy_timeout = 600
+
+    rbd_user = openstack
+
+    rbd_secret_uuid = 9cfb3a03-3f91-516a-881e-a675f67c30ea
+
+    hw_disk_discard = unmap
+
+    volume_use_multipath = False
+
+
+    [glance]
+
+    endpoint_override = http://glance-az1-internal.openstack.svc:9292
+
+    valid_interfaces = internal
+
+
+    [cinder]
+
+    cross_az_attach = False
+
+    catalog_info = volumev3:cinderv3:internalURL
+
+
+    '
 kind: ConfigMap
 metadata:
-  name: ceph-nova
+  name: ceph-nova-az1
   namespace: openstack
 ---
 apiVersion: v1
 data:
+  az1.client.openstack.keyring: <redacted>
+  az1.conf: <redacted>
   ceph.client.openstack.keyring: <redacted>
   ceph.conf: <redacted>
 kind: Secret
 metadata:
   name: ceph-conf-files
-  namespace: openstack
-type: Opaque
----
-apiVersion: v1
-data:
-  authorized_keys: <redacted>
-  ssh-privatekey: <redacted>
-  ssh-publickey: <redacted>
-kind: Secret
-metadata:
-  name: dataplane-ansible-ssh-private-key-secret
-  namespace: openstack
-type: Opaque
----
-apiVersion: v1
-data:
-  ssh-privatekey: <redacted>
-  ssh-publickey: <redacted>
-kind: Secret
-metadata:
-  name: nova-migration-ssh-key
-  namespace: openstack
-type: kubernetes.io/ssh-auth
----
-apiVersion: v1
-data:
-  AdminPassword: <redacted>
-  CeilometerPassword: <redacted>
-  CinderDatabasePassword: <redacted>
-  CinderPassword: <redacted>
-  DatabasePassword: <redacted>
-  DbRootPassword: <redacted>
-  DesignateDatabasePassword: <redacted>
-  DesignatePassword: <redacted>
-  GlanceDatabasePassword: <redacted>
-  GlancePassword: <redacted>
-  HeatAuthEncryptionKey: <redacted>
-  HeatDatabasePassword: <redacted>
-  HeatPassword: <redacted>
-  IronicDatabasePassword: <redacted>
-  IronicInspectorDatabasePassword: <redacted>
-  IronicInspectorPassword: <redacted>
-  IronicPassword: <redacted>
-  KeystoneDatabasePassword: <redacted>
-  ManilaDatabasePassword: <redacted>
-  ManilaPassword: <redacted>
-  MetadataSecret: <redacted>
-  NeutronDatabasePassword: <redacted>
-  NeutronPassword: <redacted>
-  NovaAPIDatabasePassword: <redacted>
-  NovaCell0DatabasePassword: <redacted>
-  NovaCell1DatabasePassword: <redacted>
-  NovaPassword: <redacted>
-  OctaviaDatabasePassword: <redacted>
-  OctaviaPassword: <redacted>
-  PlacementDatabasePassword: <redacted>
-  PlacementPassword: <redacted>
-  SwiftPassword: <redacted>
-kind: Secret
-metadata:
-  name: osp-secret
   namespace: openstack
 type: Opaque
 ---
@@ -115,29 +84,82 @@ spec:
               spec:
                 type: LoadBalancer
       cinderBackup:
-        customServiceConfig: |
-          [DEFAULT]
+        customServiceConfig: '[DEFAULT]
+
           backup_driver = cinder.backup.drivers.ceph.CephBackupDriver
+
           backup_ceph_pool = backups
+
           backup_ceph_user = openstack
+
+          '
         networkAttachments:
         - storage
         replicas: 0
       cinderScheduler:
         replicas: 1
       cinderVolumes:
-        ceph:
-          customServiceConfig: |-
-            [DEFAULT]
-            enabled_backends=ceph
+        az1:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_backends = ceph
+
+            storage_availability_zone = az1
+
+            default_availability_zone = az1
+
+            glance_api_servers = http://glance-az1-internal.openstack.svc:9292
+
+
             [ceph]
-            volume_backend_name=ceph
-            volume_driver=cinder.volume.drivers.rbd.RBDDriver
-            rbd_flatten_volume_from_snapshot=False
-            rbd_pool=volumes
-            rbd_ceph_conf=/etc/ceph/ceph.conf
-            rbd_user=openstack
-            rbd_secret_uuid=e9fd4d44-2dbb-5dc8-95f2-4fcf8da7121c
+
+            volume_backend_name = ceph
+
+            volume_driver = cinder.volume.drivers.rbd.RBDDriver
+
+            rbd_flatten_volume_from_snapshot = False
+
+            rbd_pool = volumes
+
+            rbd_ceph_conf = /etc/ceph/az1.conf
+
+            rbd_user = openstack
+
+            rbd_secret_uuid = 9cfb3a03-3f91-516a-881e-a675f67c30ea
+
+            rbd_cluster_name = az1
+
+
+            [cinder]
+
+            cross_az_attach = false
+
+
+            '
+        ceph:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_backends = ceph
+
+
+            [ceph]
+
+            volume_backend_name = ceph
+
+            volume_driver = cinder.volume.drivers.rbd.RBDDriver
+
+            rbd_ceph_conf = /etc/ceph/ceph.conf
+
+            rbd_user = openstack
+
+            rbd_pool = volumes
+
+            rbd_flatten_volume_from_snapshot = False
+
+            rbd_secret_uuid = e9fd4d44-2dbb-5dc8-95f2-4fcf8da7121c
+
+
+            '
       databaseInstance: openstack
       secret: osp-secret
   dns:
@@ -192,19 +214,100 @@ spec:
       default:
         route: {}
     template:
-      customServiceConfig: |
-        [DEFAULT]
-        enabled_backends = default_backend:rbd
-        [glance_store]
-        default_backend = default_backend
-        [default_backend]
-        rbd_store_ceph_conf = /etc/ceph/ceph.conf
-        store_description = "RBD backend"
-        rbd_store_pool = images
-        rbd_store_user = openstack
+      databaseAccount: glance
       databaseInstance: openstack
       glanceAPIs:
+        az1:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_import_methods = [web-download,copy-image,glance-direct]
+
+            enabled_backends = az0:rbd,az1:rbd
+
+
+            [glance_store]
+
+            stores = http,rbd
+
+            default_backend = az1
+
+
+            [az1]
+
+            rbd_store_ceph_conf = /etc/ceph/az1.conf
+
+            store_description = "az1 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            [az0]
+
+            rbd_store_ceph_conf = /etc/ceph/ceph.conf
+
+            store_description = "az0 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            '
+          networkAttachments:
+          - storage
+          override:
+            service:
+              internal:
+                metadata:
+                  annotations:
+                    metallb.universe.tf/address-pool: internalapi
+                    metallb.universe.tf/allow-shared-ip: internalapi
+                    metallb.universe.tf/loadBalancerIPs: 172.17.0.81
+                spec:
+                  type: LoadBalancer
+          preserveJobs: false
+          replicas: 3
+          type: edge
         default:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_import_methods = [web-download,copy-image,glance-direct]
+
+            enabled_backends = az0:rbd,az1:rbd
+
+
+            [glance_store]
+
+            stores = http,rbd
+
+            default_backend = az0
+
+
+            [az0]
+
+            rbd_store_ceph_conf = /etc/ceph/ceph.conf
+
+            store_description = "az0 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            [az1]
+
+            rbd_store_ceph_conf = /etc/ceph/az1.conf
+
+            store_description = "az1 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            '
           networkAttachments:
           - storage
           override:
@@ -217,7 +320,11 @@ spec:
                     metallb.universe.tf/loadBalancerIPs: 172.17.0.80
                 spec:
                   type: LoadBalancer
+          preserveJobs: false
           replicas: 3
+          type: split
+      keystoneEndpoint: default
+      serviceUser: glance
       storageClass: local-storage
       storageRequest: 10G
   heat:
@@ -296,9 +403,11 @@ spec:
     enabled: false
     template:
       manilaAPI:
-        customServiceConfig: |
-          [DEFAULT]
+        customServiceConfig: '[DEFAULT]
+
           enabled_share_protocols=nfs,cephfs
+
+          '
         networkAttachments:
         - internalapi
         override:
@@ -316,19 +425,31 @@ spec:
         replicas: 1
       manilaShares:
         share1:
-          customServiceConfig: |
-            [DEFAULT]
+          customServiceConfig: '[DEFAULT]
+
             enabled_share_backends = cephfs
+
             enabled_share_protocols = cephfs
+
             [cephfs]
+
             driver_handles_share_servers = False
+
             share_backend_name = cephfs
+
             share_driver = manila.share.drivers.cephfs.driver.CephFSDriver
+
             cephfs_conf_path = /etc/ceph/ceph.conf
+
             cephfs_cluster_name = ceph
+
             cephfs_auth_id=openstack
+
             cephfs_volume_mode = 0755
+
             cephfs_protocol_helper_type = CEPHFS
+
+            '
           networkAttachments:
           - storage
           replicas: 1
@@ -478,21 +599,21 @@ spec:
 apiVersion: dataplane.openstack.org/v1beta1
 kind: OpenStackDataPlaneDeployment
 metadata:
-  name: edpm-deployment-post-ceph
+  name: edpm-deployment-post-ceph-az1
   namespace: openstack
 spec:
   nodeSets:
-  - openstack-edpm
+  - openstack-edpm-az1
 ---
 apiVersion: dataplane.openstack.org/v1beta1
 kind: OpenStackDataPlaneNodeSet
 metadata:
-  name: openstack-edpm
+  name: openstack-edpm-az1
   namespace: openstack
 spec:
   env:
   - name: ANSIBLE_FORCE_COLOR
-    value: "True"
+    value: 'True'
   networkAttachments:
   - ctlplane
   nodeTemplate:
@@ -514,47 +635,31 @@ spec:
           }}'
         edpm_network_config_hide_sensitive_logs: false
         edpm_network_config_os_net_config_mappings:
-          edpm-compute-0:
-            nic1: 52:54:00:1e:af:6b
-            nic2: 52:54:00:d9:cb:f4
-          edpm-compute-1:
-            nic1: 52:54:00:f2:bc:af
-            nic2: 52:54:00:f1:c7:dd
-          edpm-compute-2:
-            nic1: 52:54:00:dd:33:14
-            nic2: 52:54:00:50:fb:c3
-        edpm_network_config_template: |
-          ---
-          {% set mtu_list = [ctlplane_mtu] %}
-          {% for network in nodeset_networks %}
-          {{ mtu_list.append(lookup('vars', networks_lower[network] ~ '_mtu')) }}
-          {%- endfor %}
-          {% set min_viable_mtu = mtu_list | max %}
-          network_config:
-          - type: ovs_bridge
-            name: {{ neutron_physical_bridge_name }}
-            mtu: {{ min_viable_mtu }}
-            use_dhcp: false
-            dns_servers: {{ ctlplane_dns_nameservers }}
-            domain: {{ dns_search_domains }}
-            addresses:
-            - ip_netmask: {{ ctlplane_ip }}/{{ ctlplane_cidr }}
-            routes: {{ ctlplane_host_routes }}
-            members:
-            - type: interface
-              name: nic2
-              mtu: {{ min_viable_mtu }}
-              # force the MAC address of the bridge to this interface
-              primary: true
-          {% for network in nodeset_networks %}
-            - type: vlan
-              mtu: {{ lookup('vars', networks_lower[network] ~ '_mtu') }}
-              vlan_id: {{ lookup('vars', networks_lower[network] ~ '_vlan_id') }}
-              addresses:
-              - ip_netmask:
-                  {{ lookup('vars', networks_lower[network] ~ '_ip') }}/{{ lookup('vars', networks_lower[network] ~ '_cidr') }}
-              routes: {{ lookup('vars', networks_lower[network] ~ '_host_routes') }}
-          {% endfor %}
+          edpm-compute-3:
+            nic1: 52:54:00:61:74:38
+            nic2: 52:54:00:5b:ce:ee
+          edpm-compute-4:
+            nic1: 52:54:00:d9:f8:8f
+            nic2: 52:54:00:9c:64:8a
+          edpm-compute-5:
+            nic1: 52:54:00:30:85:e7
+            nic2: 52:54:00:b7:c9:ce
+        edpm_network_config_template: "---\n{% set mtu_list = [ctlplane_mtu] %}\n\
+          {% for network in nodeset_networks %}\n{{ mtu_list.append(lookup('vars',\
+          \ networks_lower[network] ~ '_mtu')) }}\n{%- endfor %}\n{% set min_viable_mtu\
+          \ = mtu_list | max %}\nnetwork_config:\n- type: ovs_bridge\n  name: {{ neutron_physical_bridge_name\
+          \ }}\n  mtu: {{ min_viable_mtu }}\n  use_dhcp: false\n  dns_servers: {{\
+          \ ctlplane_dns_nameservers }}\n  domain: {{ dns_search_domains }}\n  addresses:\n\
+          \  - ip_netmask: {{ ctlplane_ip }}/{{ ctlplane_cidr }}\n  routes: {{ ctlplane_host_routes\
+          \ }}\n  members:\n  - type: interface\n    name: nic2\n    mtu: {{ min_viable_mtu\
+          \ }}\n    # force the MAC address of the bridge to this interface\n    primary:\
+          \ true\n{% for network in nodeset_networks %}\n  - type: vlan\n    mtu:\
+          \ {{ lookup('vars', networks_lower[network] ~ '_mtu') }}\n    vlan_id: {{\
+          \ lookup('vars', networks_lower[network] ~ '_vlan_id') }}\n    addresses:\n\
+          \    - ip_netmask:\n        {{ lookup('vars', networks_lower[network] ~\
+          \ '_ip') }}/{{ lookup('vars', networks_lower[network] ~ '_cidr') }}\n  \
+          \  routes: {{ lookup('vars', networks_lower[network] ~ '_host_routes') }}\n\
+          {% endfor %}\n"
         edpm_neutron_metadata_agent_image: '{{ registry_url }}/openstack-neutron-metadata-agent-ovn:{{
           image_tag }}'
         edpm_nodes_validation_validate_controllers_icmp: false
@@ -579,7 +684,7 @@ spec:
         service_net_map:
           nova_api_network: internalapi
           nova_libvirt_network: internalapi
-        storage_mgmt_cidr: "24"
+        storage_mgmt_cidr: '24'
         storage_mgmt_host_routes: []
         storage_mgmt_mtu: 9000
         storage_mgmt_vlan_id: 23
@@ -609,13 +714,13 @@ spec:
     - name: tenant
       subnetName: subnet1
   nodes:
-    edpm-compute-0:
+    edpm-compute-3:
       ansible:
-        host: 192.168.122.100
-      hostName: compute-0
+        host: 192.168.122.103
+      hostName: compute-3
       networks:
       - defaultRoute: true
-        fixedIP: 192.168.122.100
+        fixedIP: 192.168.122.103
         name: ctlplane
         subnetName: subnet1
       - name: internalapi
@@ -626,13 +731,13 @@ spec:
         subnetName: subnet1
       - name: tenant
         subnetName: subnet1
-    edpm-compute-1:
+    edpm-compute-4:
       ansible:
-        host: 192.168.122.101
-      hostName: compute-1
+        host: 192.168.122.104
+      hostName: compute-4
       networks:
       - defaultRoute: true
-        fixedIP: 192.168.122.101
+        fixedIP: 192.168.122.104
         name: ctlplane
         subnetName: subnet1
       - name: internalapi
@@ -643,13 +748,13 @@ spec:
         subnetName: subnet1
       - name: tenant
         subnetName: subnet1
-    edpm-compute-2:
+    edpm-compute-5:
       ansible:
-        host: 192.168.122.102
-      hostName: compute-2
+        host: 192.168.122.105
+      hostName: compute-5
       networks:
       - defaultRoute: true
-        fixedIP: 192.168.122.102
+        fixedIP: 192.168.122.105
         name: ctlplane
         subnetName: subnet1
       - name: internalapi
@@ -667,17 +772,17 @@ spec:
   - ovn
   - neutron-metadata
   - libvirt
-  - nova-custom-ceph
+  - nova-custom-ceph-az1
 ---
 apiVersion: dataplane.openstack.org/v1beta1
 kind: OpenStackDataPlaneService
 metadata:
-  name: nova-custom-ceph
+  name: nova-custom-ceph-az1
   namespace: openstack
 spec:
   caCerts: combined-ca-bundle
   configMaps:
-  - ceph-nova
+  - ceph-nova-az1
   label: dataplane-deployment-nova-custom-ceph
   playbook: osp.edpm.nova
   secrets:

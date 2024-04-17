@@ -16,7 +16,7 @@ metadata:
 spec:
   env:
   - name: ANSIBLE_FORCE_COLOR
-    value: "True"
+    value: 'True'
   networkAttachments:
   - ctlplane
   nodeTemplate:
@@ -32,49 +32,37 @@ spec:
         - ceph_nfs
         - ceph_rgw_frontend
         - ceph_nfs_frontend
+        edpm_fips_mode: check
         edpm_iscsid_image: '{{ registry_url }}/openstack-iscsid:{{ image_tag }}'
         edpm_logrotate_crond_image: '{{ registry_url }}/openstack-cron:{{ image_tag
           }}'
         edpm_network_config_hide_sensitive_logs: false
         edpm_network_config_os_net_config_mappings:
           edpm-compute-3:
-            nic2: 52:54:00:b9:02:69
+            nic1: 52:54:00:61:74:38
+            nic2: 52:54:00:5b:ce:ee
           edpm-compute-4:
-            nic2: 52:54:00:de:a0:34
+            nic1: 52:54:00:d9:f8:8f
+            nic2: 52:54:00:9c:64:8a
           edpm-compute-5:
-            nic2: 52:54:00:12:dd:48
-        edpm_network_config_template: |
-          ---
-          {% set mtu_list = [ctlplane_mtu] %}
-          {% for network in role_networks %}
-          {{ mtu_list.append(lookup('vars', networks_lower[network] ~ '_mtu')) }}
-          {%- endfor %}
-          {% set min_viable_mtu = mtu_list | max %}
-          network_config:
-          - type: ovs_bridge
-            name: {{ neutron_physical_bridge_name }}
-            mtu: {{ min_viable_mtu }}
-            use_dhcp: false
-            dns_servers: {{ ctlplane_dns_nameservers }}
-            domain: {{ dns_search_domains }}
-            addresses:
-            - ip_netmask: {{ ctlplane_ip }}/{{ ctlplane_cidr }}
-            routes: {{ ctlplane_host_routes }}
-            members:
-            - type: interface
-              name: nic2
-              mtu: {{ min_viable_mtu }}
-              # force the MAC address of the bridge to this interface
-              primary: true
-          {% for network in role_networks %}
-            - type: vlan
-              mtu: {{ lookup('vars', networks_lower[network] ~ '_mtu') }}
-              vlan_id: {{ lookup('vars', networks_lower[network] ~ '_vlan_id') }}
-              addresses:
-              - ip_netmask:
-                  {{ lookup('vars', networks_lower[network] ~ '_ip') }}/{{ lookup('vars', networks_lower[network] ~ '_cidr') }}
-              routes: {{ lookup('vars', networks_lower[network] ~ '_host_routes') }}
-          {% endfor %}
+            nic1: 52:54:00:30:85:e7
+            nic2: 52:54:00:b7:c9:ce
+        edpm_network_config_template: "---\n{% set mtu_list = [ctlplane_mtu] %}\n\
+          {% for network in nodeset_networks %}\n{{ mtu_list.append(lookup('vars',\
+          \ networks_lower[network] ~ '_mtu')) }}\n{%- endfor %}\n{% set min_viable_mtu\
+          \ = mtu_list | max %}\nnetwork_config:\n- type: ovs_bridge\n  name: {{ neutron_physical_bridge_name\
+          \ }}\n  mtu: {{ min_viable_mtu }}\n  use_dhcp: false\n  dns_servers: {{\
+          \ ctlplane_dns_nameservers }}\n  domain: {{ dns_search_domains }}\n  addresses:\n\
+          \  - ip_netmask: {{ ctlplane_ip }}/{{ ctlplane_cidr }}\n  routes: {{ ctlplane_host_routes\
+          \ }}\n  members:\n  - type: interface\n    name: nic2\n    mtu: {{ min_viable_mtu\
+          \ }}\n    # force the MAC address of the bridge to this interface\n    primary:\
+          \ true\n{% for network in nodeset_networks %}\n  - type: vlan\n    mtu:\
+          \ {{ lookup('vars', networks_lower[network] ~ '_mtu') }}\n    vlan_id: {{\
+          \ lookup('vars', networks_lower[network] ~ '_vlan_id') }}\n    addresses:\n\
+          \    - ip_netmask:\n        {{ lookup('vars', networks_lower[network] ~\
+          \ '_ip') }}/{{ lookup('vars', networks_lower[network] ~ '_cidr') }}\n  \
+          \  routes: {{ lookup('vars', networks_lower[network] ~ '_host_routes') }}\n\
+          {% endfor %}\n"
         edpm_neutron_metadata_agent_image: '{{ registry_url }}/openstack-neutron-metadata-agent-ovn:{{
           image_tag }}'
         edpm_nodes_validation_validate_controllers_icmp: false
@@ -99,7 +87,7 @@ spec:
         service_net_map:
           nova_api_network: internalapi
           nova_libvirt_network: internalapi
-        storage_mgmt_cidr: "24"
+        storage_mgmt_cidr: '24'
         storage_mgmt_host_routes: []
         storage_mgmt_mtu: 9000
         storage_mgmt_vlan_id: 23
@@ -110,15 +98,13 @@ spec:
     managementNetwork: ctlplane
     networks:
     - defaultRoute: true
-      name: CtlPlane
+      name: ctlplane
       subnetName: subnet1
-    - name: InternalApi
+    - name: internalapi
       subnetName: subnet1
-    - name: Storage
+    - name: storage
       subnetName: subnet1
-    - name: Tenant
-      subnetName: subnet1
-    - name: StorageMgmt
+    - name: tenant
       subnetName: subnet1
   nodes:
     edpm-compute-3:
