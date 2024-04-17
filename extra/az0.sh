@@ -162,7 +162,9 @@ if [ $POSTCEPH -eq 1 ]; then
     
     pushd examples/va/hci/
     cp $SRC1 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/values.yaml
-    cp $SRC2 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
+    # This effectively copies $SRC2 but also disables manila
+    yq e '.data.manila.enabled = false' $SRC2 > ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
+
     kustomize build > post-ceph.yaml
 
     NODES=$(grep edpm-compute post-ceph.yaml | awk {'print $1'} | sort | uniq | wc -l)

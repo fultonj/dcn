@@ -137,7 +137,8 @@ if [ $POSTCEPH -eq 1 ]; then
     done
     pushd examples/va/hci/
     cp $SRC1 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/values.yaml
-    cp $SRC2 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
+    # This effectively copies $SRC2 but also disables manila
+    yq e '.data.manila.enabled = false' $SRC2 > ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
     kustomize build > post-ceph-azN-temp.yaml
 
     # Modify kustomize output with python to suit DCN scenario for any azN > 0
