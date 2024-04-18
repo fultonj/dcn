@@ -15,7 +15,6 @@ NMSTATE=0
 CONTROLPLANE=0
 DATAPLANE=0
 CEPH=0
-DNSHACK=0
 POSTCEPH=0
 DISCOVER=0
 
@@ -134,26 +133,6 @@ fi
 
 if [ $CEPH -eq 1 ]; then
     bash ~/dcn/extra/ceph.sh 100 ceph_az0.yaml
-fi
-
-if [ $DNSHACK -eq 1 ]; then
-    # short term hack, EDPM ansible will set this correctly
-    DNS=$(oc get svc -l service=dnsmasq -o json | jq -r '.items[0].status.loadBalancer.ingress[0].ip')
-    echo "Add \"nameserver $DNS\" to /etc/resolv.conf (and remove wrong DNS server)"
-    # ceph.sh puts this inventory in place
-    INV=~/src/github.com/openstack-k8s-operators/ci-framework/inventory.yml
-    ansible -b -i $INV computes -m lineinfile \
-            -a "path=/etc/resolv.conf line=\"nameserver 192.168.111.1\" state=absent"
-    ansible -b -i $INV computes -m lineinfile \
-            -a "path=/etc/resolv.conf line=\"nameserver $DNS\" state=present"
-    # Not necessary if DNS is fixed before POSTCEPH
-    # echo "restart ovn and nova_compute containers"
-    # ansible -b -i $INV computes -m shell \
-    #         -a "podman restart nova_compute"
-    # ansible -b -i $INV computes -m shell \
-    #         -a "podman restart ovn_controller"
-    # ansible -b -i $INV computes -m shell \
-    #         -a "podman restart ovn_metadata_agent"
 fi
 
 if [ $POSTCEPH -eq 1 ]; then
