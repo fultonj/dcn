@@ -36,6 +36,12 @@ is the next section.
 
 - [post-ceph-az1.yaml](post-ceph-az1.yaml)
 
+### TLS-e not enabled for Glance
+
+TLS-e is not enabled for Glance in this example. More testing
+is being done so that we can have an exmple like this with TLS-e in
+the future.
+
 ### Multibackend Configuration
 
 Note the following about the CRs in
