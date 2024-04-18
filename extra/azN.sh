@@ -8,6 +8,7 @@
 # of the product, though it can be used to solve the problem of environment
 # creation and environment variable substitution for testing.
 
+SETUP_PREV=0
 DATAPLANE=0
 CEPH=0
 POSTCEPH=0
@@ -46,36 +47,41 @@ fi
 
 export ARCH=~/src/github.com/openstack-k8s-operators/architecture
 
-# identify first ceph deployment secret file
-export CEPH_SECRET_FILE=~/az0_ceph_secret.yaml
-if [[ ! -e $CEPH_SECRET_FILE ]]; then
-    echo "CEPH_SECRET_FILE $CEPH_SECRET_FILE is missing; copying new one"
-    if [[ ! -e /tmp/k8s_ceph_secret.yml ]]; then
-	echo "Secret from first ceph deployment is missing; unable to copy"
-	exit 1
-    else
-	cp -v /tmp/k8s_ceph_secret.yml $CEPH_SECRET_FILE
+if [ $SETUP_PREV -eq 1 ]; then
+    # Identify current ceph secret file (before deploying another ceph cluster)
+    export CEPH_SECRET_FILE=~/ceph_secret.yaml
+    oc get Secret ceph-conf-files -o yaml \
+        | yq 'del(.metadata.annotations, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid)' \
+             > $CEPH_SECRET_FILE
+
+    # Identify current control plane CR (before deploying another control plane)
+    export CONTROL_PLANE_CR_FILE=~/control-plane-cr.yaml
+    # Look at the previous N
+    POST_CEPH_SRC=$ARCH/examples/va/hci/post-ceph-azN.yaml
+    if [[ ! -e $POST_CEPH_SRC ]]; then
+        # if azN.sh has not been run before to create this file
+        # then use the one from az0.sh
+        # It is called dataplane-post-ceph.yaml, but post-ceph.yaml is a better name
+        POST_CEPH_SRC=$ARCH/examples/va/hci/dataplane-post-ceph.yaml
+        if [[ ! -e $POST_CEPH_SRC ]]; then
+	    echo "Control Plane CR from first deployment is missing; unable to copy"
+	    exit 1
+        fi
     fi
+    # Copy it and ensure only kind OpenStackControlPlane is left
+    python ~/dcn/extra/control_plane_filter.py $POST_CEPH_SRC $CONTROL_PLANE_CR_FILE
+    ls -l $CONTROL_PLANE_CR_FILE
 fi
 
-# identify first control plane CR
-export CONTROL_PLANE_CR_FILE=~/control-plane-cr.yaml
-if [[ ! -e $CONTROL_PLANE_CR_FILE ]]; then
-    echo "CONTROL_PLANE_CR_FILE $CONTROL_PLANE_CR_FILE is missing; copying new one"
-    if [[ ! -e $ARCH/examples/va/hci/dataplane-post-ceph.yaml ]]; then
-	echo "Control Plane CR from first deployment is missing; unable to copy"
-	exit 1
-    else
-	# copy it and ensure only kind OpenStackControlPlane is left
-	# It is called dataplane-post-ceph.yaml, but post-ceph.yaml is a better name
-	python ~/dcn/extra/control_plane_filter.py \
-	       $ARCH/examples/va/hci/dataplane-post-ceph.yaml $CONTROL_PLANE_CR_FILE
-	ls -l $CONTROL_PLANE_CR_FILE
+for F in $CEPH_SECRET_FILE $CONTROL_PLANE_CR_FILE; do
+    if [[ ! -e $F ]]; then
+        echo "Aborting: $F is missing (run again with SETUP_PREV=1?)"
     fi
-fi
+done
 
 
 pushd $ARCH
+
 
 if [ $DATAPLANE -eq 1 ]; then
     SRC=~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-values/values.yaml
