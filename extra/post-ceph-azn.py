@@ -263,6 +263,8 @@ def add_cinder_az(cfg, az):
     
 def append_to_control_plane(src, add_cinder, add_glance, num):
     # read src into a dict and return it with cinder and glance appended
+    # add_cinder (additional cinder backend) and add_glance (additional
+    # glance backend) are new configurations for AZn
     with open(src, 'r') as src_yaml_file:
         cp = yaml.safe_load(src_yaml_file)
         # Create key for new additions based on the AZ number
@@ -279,14 +281,27 @@ def append_to_control_plane(src, add_cinder, add_glance, num):
             add_cinder['template']['cinderVolumes']['ceph']['customServiceConfig'])
 
         # 2. append add_glance to control plane (cp) glanceAPIs dict but before that...
-        # a. Rearrange structure for multiple customServiceConfigs
-        az0_glance_conf = cp['spec']['glance']['template']['customServiceConfig']
+        # a. Rearrange structure for multiple customServiceConfigs if we are on az1
+        if 'customServiceConfig' in cp['spec']['glance']['template']:
+            az0_glance_conf = cp['spec']['glance']['template']['customServiceConfig']
+            del(cp['spec']['glance']['template']['customServiceConfig'])
+        elif 'glanceAPIs' in cp['spec']['glance']['template']:
+            # We already have multiple customServiceConfigs
+            # "az0_glance_conf" refers to the default glance
+            # who's INI might contain backends for AZ(n-1), AZ(n-2), ..., AZ0
+            # We still want to add AZn (the add_glance dict) to it though
+            if 'default' in cp['spec']['glance']['template']['glanceAPIs']:
+                az0_glance_conf = cp['spec']['glance']['template']['glanceAPIs']['default']['customServiceConfig']
+            else:
+                print("WARNING: no default backend in glanceAPIs list")
+        else:
+            print("WARNING: glanceAPIs or customServiceConfig missing from glance")
+
         azn_glance_conf = add_glance['template']['customServiceConfig']
         cp['spec']['glance']['template']['glanceAPIs']['default']['customServiceConfig'] =\
             set_az0_glance_conf(az0_glance_conf, azn_glance_conf, num)
         add_glance['template']['glanceAPIs']['default']['customServiceConfig'] =\
             set_azn_glance_conf(az0_glance_conf, azn_glance_conf, num)
-        del(cp['spec']['glance']['template']['customServiceConfig'])
 
         # b. keep glance overrides per service but increment azN's LB IP
         add_glance['template']['glanceAPIs']['default']['override'] =\
