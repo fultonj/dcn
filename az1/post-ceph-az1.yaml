@@ -130,11 +130,6 @@ spec:
             rbd_cluster_name = az1
 
 
-            [cinder]
-
-            cross_az_attach = false
-
-
             '
         ceph:
           customServiceConfig: '[DEFAULT]

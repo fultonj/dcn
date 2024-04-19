@@ -132,11 +132,6 @@ spec:
             rbd_cluster_name = az1
 
 
-            [cinder]
-
-            cross_az_attach = false
-
-
             '
         az2:
           customServiceConfig: '[DEFAULT]
@@ -167,11 +162,6 @@ spec:
             rbd_secret_uuid = 594dc2c6-e0fa-5afd-92ee-6ae7a4089da1
 
             rbd_cluster_name = az2
-
-
-            [cinder]
-
-            cross_az_attach = false
 
 
             '
@@ -505,7 +495,7 @@ spec:
   manila:
     apiOverride:
       route: {}
-    enabled: true
+    enabled: false
     template:
       manilaAPI:
         customServiceConfig: '[DEFAULT]

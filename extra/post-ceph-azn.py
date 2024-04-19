@@ -243,10 +243,6 @@ def add_cinder_az(cfg, az):
     # We used this setting in the past, but I assume not anymore
     # cinder_cp['DEFAULT']['cluster'] = az
 
-    if 'cinder' not in cinder_cp:
-        cinder_cp['cinder'] = {}
-    cinder_cp['cinder']['cross_az_attach'] = 'false'
-
     cinder_cp['ceph']['rbd_cluster_name'] = az
     # We used this setting in the past, but I assume not anymore
     # cinder_cp['ceph']['backend_host']
