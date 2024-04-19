@@ -14,7 +14,7 @@ works of the CRs from [AZ1](../az1).
 - The same [testing pattern](../az1/testing.md) can be followed but
   substitute "az2" for "az1"
 
-## Observe Pods
+## Observe Pods and Services
 
 After the default, AZ1 and AZ2 deployments there should be a Cinder
 volume pod for every Ceph cluster.
@@ -25,6 +25,21 @@ cinder-volume-az2-0                                               2/2     Runnin
 cinder-volume-ceph-0                                              2/2     Running     0              47h
 $
 ```
+Each pod provides a cinder volume service for a unique ceph cluster
+per zone ("nova" is the name of the default zone).
+```
+$ openstack volume service list
++------------------+---------------------------+------+---------+-------+----------------------------+
+| Binary           | Host                      | Zone | Status  | State | Updated At                 |
++------------------+---------------------------+------+---------+-------+----------------------------+
+| cinder-scheduler | cinder-scheduler-0        | nova | enabled | up    | 2024-04-19T21:02:48.000000 |
+| cinder-volume    | cinder-volume-ceph-0@ceph | nova | enabled | up    | 2024-04-19T21:02:54.000000 |
+| cinder-volume    | cinder-volume-az1-0@ceph  | az1  | enabled | up    | 2024-04-19T21:02:56.000000 |
+| cinder-volume    | cinder-volume-az2-0@ceph  | az2  | enabled | up    | 2024-04-19T21:02:52.000000 |
++------------------+---------------------------+------+---------+-------+----------------------------+
+$
+```
+
 With replicas set to 3 for glance, we have the following Glance pods.
 ```
 $ oc get pods | grep glance | grep api
