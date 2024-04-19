@@ -15,6 +15,9 @@ providing RBD support for Nova, Glance and Cinder.
 - All hardware is pre-provisioned. See [design example](design.md)
   for how many nodes and AZs are used in the example CRs.
 
+- Production versions of these examples should use a spine/leaf
+  network
+
 ## Steps
 
 To implement the [design example](design.md) AZs are deployed
@@ -23,3 +26,4 @@ sequentially. Each link below contains example CRs and notes.
 - [Deploy AZ0](az0)
 - [Deploy AZ1](az1)
 - [Deploy AZ2](az2)
+- [Deploy AZ3](az3)

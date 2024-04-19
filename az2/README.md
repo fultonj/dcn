@@ -14,6 +14,35 @@ works of the CRs from [AZ1](../az1).
 - The same [testing pattern](../az1/testing.md) can be followed but
   substitute "az2" for "az1"
 
+## Observe Pods
+
+After the default, AZ1 and AZ2 deployments there should be a Cinder
+volume pod for every Ceph cluster.
+```
+$ oc get pods | grep cinder-volume
+cinder-volume-az1-0                                               2/2     Running     0              47h
+cinder-volume-az2-0                                               2/2     Running     0              46m
+cinder-volume-ceph-0                                              2/2     Running     0              47h
+$
+```
+With replicas set to 3 for glance, we have the following Glance pods.
+```
+$ oc get pods | grep glance | grep api
+glance-az1-edge-api-0                                             3/3     Running     0              47h
+glance-az1-edge-api-1                                             3/3     Running     0              47h
+glance-az1-edge-api-2                                             3/3     Running     0              47h
+glance-az2-edge-api-0                                             3/3     Running     0              47m
+glance-az2-edge-api-1                                             3/3     Running     0              47m
+glance-az2-edge-api-2                                             3/3     Running     0              47m
+glance-default-external-api-0                                     3/3     Running     0              47m
+glance-default-external-api-1                                     3/3     Running     0              47m
+glance-default-external-api-2                                     3/3     Running     0              47m
+glance-default-internal-api-0                                     3/3     Running     0              47m
+glance-default-internal-api-1                                     3/3     Running     0              47m
+glance-default-internal-api-2                                     3/3     Running     0              47m
+$
+```
+
 ## Pattern for adding more AZs
 
 Compare the post-ceph AZ1 to AZ2
@@ -31,16 +60,15 @@ configuration from the `diff` command shows a pattern:
 5. A new Cinder volume service was added for AZ2
 6. New compute nodes in AZ2 use the new ceph cluster for AZ2
 
-If another AZ was added, the next step of the pattern would be:
+If another AZ N was added, the next step of the pattern would be:
 
-1. The AZ0 split Glance has 4 backends: AZ0 (default), AZ1, AZ2, AZ3
+1. The AZ0 split Glance has 4 backends: AZ0 (default), AZ1, AZ2, AZN
 2. The AZ1 edge Glance has 2 backends: AZ1 (defaullt), AZ0
 3. The AZ2 edge Glance has 2 backends: AZ2 (defaullt), AZ0
-4. The new AZ3 edge Glance has 2 backends: AZ3 (defaullt), AZ0
-5. A new end point at glance-az3-internal.openstack.svc
-   which uses loadBalancerIPs: 172.17.0.83
-6. A new Cinder volume service was added for AZ3
-7. New compute nodes in AZ3 use the new ceph cluster for AZ3
+4. The new AZN edge Glance has 2 backends: AZN (defaullt), AZ0
+5. A new end point at glance-azN-internal.openstack.svc
+   which uses loadBalancerIPs: 172.17.0.8N
+6. A new Cinder volume service was added for AZN
+7. New compute nodes in AZN use the new ceph cluster for AZN
 
-With each AZ added we update the AZ0 glance to use the new Ceph
-backend.
+With each AZ site added, the the AZ0 glance is updated to use the new Ceph backend.

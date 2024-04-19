@@ -3,8 +3,8 @@
 ```
 OpenShift
 - AZ0 default openstack-k8s-operators pods
-- AZ1 pods for cinder-volume-ceph-1 and glance-az1-internal-api-*
-- AZ2 pods for cinder-volume-ceph-2 and glance-az2-internal-api-*
+- AZ1 pods for cinder-volume-az1-0 and glance-az1-edge-api-*
+- AZ2 pods for cinder-volume-az2-0 and glance-az2-edge-api-*
 
 AZ0: (ceph0)
 - edpm-compute-0
