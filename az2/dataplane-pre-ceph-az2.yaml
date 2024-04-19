@@ -1,0 +1,170 @@
+---
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneDeployment
+metadata:
+  name: edpm-deployment-pre-ceph-az2
+  namespace: openstack
+spec:
+  nodeSets:
+  - openstack-edpm-az2
+---
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneNodeSet
+metadata:
+  name: openstack-edpm-az2
+  namespace: openstack
+spec:
+  env:
+  - name: ANSIBLE_FORCE_COLOR
+    value: 'True'
+  networkAttachments:
+  - ctlplane
+  nodeTemplate:
+    ansible:
+      ansiblePort: 22
+      ansibleUser: zuul
+      ansibleVars:
+        edpm_ceph_hci_pre_enabled_services:
+        - ceph_mon
+        - ceph_mgr
+        - ceph_osd
+        - ceph_rgw
+        - ceph_nfs
+        - ceph_rgw_frontend
+        - ceph_nfs_frontend
+        edpm_fips_mode: check
+        edpm_iscsid_image: '{{ registry_url }}/openstack-iscsid:{{ image_tag }}'
+        edpm_logrotate_crond_image: '{{ registry_url }}/openstack-cron:{{ image_tag
+          }}'
+        edpm_network_config_hide_sensitive_logs: false
+        edpm_network_config_os_net_config_mappings:
+          edpm-compute-6:
+            nic1: 52:54:00:75:33:0a
+            nic2: 52:54:00:6a:28:6f
+          edpm-compute-7:
+            nic1: 52:54:00:33:6c:4c
+            nic2: 52:54:00:7a:95:5b
+          edpm-compute-8:
+            nic1: 52:54:00:4b:58:8d
+            nic2: 52:54:00:68:c2:4f
+        edpm_network_config_template: "---\n{% set mtu_list = [ctlplane_mtu] %}\n\
+          {% for network in nodeset_networks %}\n{{ mtu_list.append(lookup('vars',\
+          \ networks_lower[network] ~ '_mtu')) }}\n{%- endfor %}\n{% set min_viable_mtu\
+          \ = mtu_list | max %}\nnetwork_config:\n- type: ovs_bridge\n  name: {{ neutron_physical_bridge_name\
+          \ }}\n  mtu: {{ min_viable_mtu }}\n  use_dhcp: false\n  dns_servers: {{\
+          \ ctlplane_dns_nameservers }}\n  domain: {{ dns_search_domains }}\n  addresses:\n\
+          \  - ip_netmask: {{ ctlplane_ip }}/{{ ctlplane_cidr }}\n  routes: {{ ctlplane_host_routes\
+          \ }}\n  members:\n  - type: interface\n    name: nic2\n    mtu: {{ min_viable_mtu\
+          \ }}\n    # force the MAC address of the bridge to this interface\n    primary:\
+          \ true\n{% for network in nodeset_networks %}\n  - type: vlan\n    mtu:\
+          \ {{ lookup('vars', networks_lower[network] ~ '_mtu') }}\n    vlan_id: {{\
+          \ lookup('vars', networks_lower[network] ~ '_vlan_id') }}\n    addresses:\n\
+          \    - ip_netmask:\n        {{ lookup('vars', networks_lower[network] ~\
+          \ '_ip') }}/{{ lookup('vars', networks_lower[network] ~ '_cidr') }}\n  \
+          \  routes: {{ lookup('vars', networks_lower[network] ~ '_host_routes') }}\n\
+          {% endfor %}\n"
+        edpm_neutron_metadata_agent_image: '{{ registry_url }}/openstack-neutron-metadata-agent-ovn:{{
+          image_tag }}'
+        edpm_nodes_validation_validate_controllers_icmp: false
+        edpm_nodes_validation_validate_gateway_icmp: false
+        edpm_nova_compute_container_image: '{{ registry_url }}/openstack-nova-compute:{{
+          image_tag }}'
+        edpm_nova_libvirt_container_image: '{{ registry_url }}/openstack-nova-libvirt:{{
+          image_tag }}'
+        edpm_ovn_controller_agent_image: '{{ registry_url }}/openstack-ovn-controller:{{
+          image_tag }}'
+        edpm_selinux_mode: enforcing
+        edpm_sshd_allowed_ranges:
+        - 192.168.122.0/24
+        - 192.168.111.0/24
+        edpm_sshd_configure_firewall: true
+        enable_debug: false
+        gather_facts: false
+        image_tag: current-podified
+        neutron_physical_bridge_name: br-ex
+        neutron_public_interface_name: eth0
+        registry_url: quay.io/podified-antelope-centos9
+        service_net_map:
+          nova_api_network: internalapi
+          nova_libvirt_network: internalapi
+        storage_mgmt_cidr: '24'
+        storage_mgmt_host_routes: []
+        storage_mgmt_mtu: 9000
+        storage_mgmt_vlan_id: 23
+        storage_mtu: 9000
+        timesync_ntp_servers:
+        - hostname: pool.ntp.org
+    ansibleSSHPrivateKeySecret: dataplane-ansible-ssh-private-key-secret
+    managementNetwork: ctlplane
+    networks:
+    - defaultRoute: true
+      name: ctlplane
+      subnetName: subnet1
+    - name: internalapi
+      subnetName: subnet1
+    - name: storage
+      subnetName: subnet1
+    - name: tenant
+      subnetName: subnet1
+  nodes:
+    edpm-compute-6:
+      ansible:
+        host: 192.168.122.106
+      hostName: compute-6
+      networks:
+      - defaultRoute: true
+        fixedIP: 192.168.122.106
+        name: ctlplane
+        subnetName: subnet1
+      - name: internalapi
+        subnetName: subnet1
+      - name: storage
+        subnetName: subnet1
+      - name: storagemgmt
+        subnetName: subnet1
+      - name: tenant
+        subnetName: subnet1
+    edpm-compute-7:
+      ansible:
+        host: 192.168.122.107
+      hostName: compute-7
+      networks:
+      - defaultRoute: true
+        fixedIP: 192.168.122.107
+        name: ctlplane
+        subnetName: subnet1
+      - name: internalapi
+        subnetName: subnet1
+      - name: storage
+        subnetName: subnet1
+      - name: storagemgmt
+        subnetName: subnet1
+      - name: tenant
+        subnetName: subnet1
+    edpm-compute-8:
+      ansible:
+        host: 192.168.122.108
+      hostName: compute-8
+      networks:
+      - defaultRoute: true
+        fixedIP: 192.168.122.108
+        name: ctlplane
+        subnetName: subnet1
+      - name: internalapi
+        subnetName: subnet1
+      - name: storage
+        subnetName: subnet1
+      - name: storagemgmt
+        subnetName: subnet1
+      - name: tenant
+        subnetName: subnet1
+  preProvisioned: true
+  services:
+  - bootstrap
+  - configure-network
+  - validate-network
+  - install-os
+  - ceph-hci-pre
+  - configure-os
+  - run-os
+  - reboot-os

@@ -17,11 +17,9 @@ providing RBD support for Nova, Glance and Cinder.
 
 ## Steps
 
-To implement the [design example](design.md) three AZs are deployed
-sequentially and then AZ0 is updated. Each link below contains example
-CRs and notes.
+To implement the [design example](design.md) AZs are deployed
+sequentially. Each link below contains example CRs and notes.
 
 - [Deploy AZ0](az0)
 - [Deploy AZ1](az1)
 - [Deploy AZ2](az2)
-- [Update AZ0](update)

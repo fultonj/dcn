@@ -1,0 +1,902 @@
+---
+apiVersion: v1
+data:
+  03-ceph-nova.conf: '[libvirt]
+
+    images_type = rbd
+
+    images_rbd_pool = vms
+
+    images_rbd_ceph_conf = /etc/ceph/az2.conf
+
+    images_rbd_glance_store_name = az2
+
+    images_rbd_glance_copy_poll_interval = 15
+
+    images_rbd_glance_copy_timeout = 600
+
+    rbd_user = openstack
+
+    rbd_secret_uuid = 594dc2c6-e0fa-5afd-92ee-6ae7a4089da1
+
+    hw_disk_discard = unmap
+
+    volume_use_multipath = False
+
+
+    [glance]
+
+    endpoint_override = http://glance-az2-internal.openstack.svc:9292
+
+    valid_interfaces = internal
+
+
+    [cinder]
+
+    cross_az_attach = False
+
+    catalog_info = volumev3:cinderv3:internalURL
+
+
+    '
+kind: ConfigMap
+metadata:
+  name: ceph-nova-az2
+  namespace: openstack
+---
+apiVersion: v1
+data:
+  az1.client.openstack.keyring: <redacted>
+  az1.conf: <redacted>
+  az2.client.openstack.keyring: <redacted>
+  az2.conf: <redacted>
+  ceph.client.openstack.keyring: <redacted>
+  ceph.conf: <redacted>
+kind: Secret
+metadata:
+  name: ceph-conf-files
+  namespace: openstack
+type: Opaque
+---
+apiVersion: core.openstack.org/v1beta1
+kind: OpenStackControlPlane
+metadata:
+  name: controlplane
+  namespace: openstack
+spec:
+  ceilometer:
+    template:
+      passwordSelector:
+        service: CeilometerPassword
+      secret: osp-secret
+      serviceUser: ceilometer
+  cinder:
+    apiOverride:
+      route: {}
+    template:
+      cinderAPI:
+        override:
+          service:
+            internal:
+              metadata:
+                annotations:
+                  metallb.universe.tf/address-pool: internalapi
+                  metallb.universe.tf/allow-shared-ip: internalapi
+                  metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+              spec:
+                type: LoadBalancer
+      cinderBackup:
+        customServiceConfig: '[DEFAULT]
+
+          backup_driver = cinder.backup.drivers.ceph.CephBackupDriver
+
+          backup_ceph_pool = backups
+
+          backup_ceph_user = openstack
+
+          '
+        networkAttachments:
+        - storage
+        replicas: 0
+      cinderScheduler:
+        replicas: 1
+      cinderVolumes:
+        az1:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_backends = ceph
+
+            storage_availability_zone = az1
+
+            default_availability_zone = az1
+
+            glance_api_servers = http://glance-az1-internal.openstack.svc:9292
+
+
+            [ceph]
+
+            volume_backend_name = ceph
+
+            volume_driver = cinder.volume.drivers.rbd.RBDDriver
+
+            rbd_flatten_volume_from_snapshot = False
+
+            rbd_pool = volumes
+
+            rbd_ceph_conf = /etc/ceph/az1.conf
+
+            rbd_user = openstack
+
+            rbd_secret_uuid = 9cfb3a03-3f91-516a-881e-a675f67c30ea
+
+            rbd_cluster_name = az1
+
+
+            [cinder]
+
+            cross_az_attach = false
+
+
+            '
+        az2:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_backends = ceph
+
+            storage_availability_zone = az2
+
+            default_availability_zone = az2
+
+            glance_api_servers = http://glance-az2-internal.openstack.svc:9292
+
+
+            [ceph]
+
+            volume_backend_name = ceph
+
+            volume_driver = cinder.volume.drivers.rbd.RBDDriver
+
+            rbd_flatten_volume_from_snapshot = False
+
+            rbd_pool = volumes
+
+            rbd_ceph_conf = /etc/ceph/az2.conf
+
+            rbd_user = openstack
+
+            rbd_secret_uuid = 594dc2c6-e0fa-5afd-92ee-6ae7a4089da1
+
+            rbd_cluster_name = az2
+
+
+            [cinder]
+
+            cross_az_attach = false
+
+
+            '
+        ceph:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_backends = ceph
+
+
+            [ceph]
+
+            volume_backend_name = ceph
+
+            volume_driver = cinder.volume.drivers.rbd.RBDDriver
+
+            rbd_ceph_conf = /etc/ceph/ceph.conf
+
+            rbd_user = openstack
+
+            rbd_pool = volumes
+
+            rbd_flatten_volume_from_snapshot = False
+
+            rbd_secret_uuid = e9fd4d44-2dbb-5dc8-95f2-4fcf8da7121c
+
+
+            '
+      databaseInstance: openstack
+      secret: osp-secret
+  dns:
+    template:
+      options:
+      - key: server
+        values:
+        - 192.168.122.1
+      override:
+        service:
+          metadata:
+            annotations:
+              metallb.universe.tf/address-pool: ctlplane
+              metallb.universe.tf/allow-shared-ip: ctlplane
+              metallb.universe.tf/loadBalancerIPs: 192.168.122.80
+          spec:
+            type: LoadBalancer
+      replicas: 1
+  extraMounts:
+  - extraVol:
+    - extraVolType: Ceph
+      mounts:
+      - mountPath: /etc/ceph
+        name: ceph
+        readOnly: true
+      propagation:
+      - CinderVolume
+      - CinderBackup
+      - GlanceAPI
+      - ManilaShare
+      volumes:
+      - name: ceph
+        projected:
+          sources:
+          - secret:
+              name: ceph-conf-files
+    name: v1
+    region: r1
+  galera:
+    enabled: true
+    templates:
+      openstack:
+        replicas: 3
+        secret: osp-secret
+        storageRequest: 500M
+      openstack-cell1:
+        replicas: 3
+        secret: osp-secret
+        storageRequest: 500M
+  glance:
+    apiOverrides:
+      default:
+        route: {}
+    template:
+      databaseAccount: glance
+      databaseInstance: openstack
+      glanceAPIs:
+        az1:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_import_methods = [web-download,copy-image,glance-direct]
+
+            enabled_backends = az0:rbd,az1:rbd
+
+
+            [glance_store]
+
+            stores = http,rbd
+
+            default_backend = az1
+
+
+            [az1]
+
+            rbd_store_ceph_conf = /etc/ceph/az1.conf
+
+            store_description = "az1 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            [az0]
+
+            rbd_store_ceph_conf = /etc/ceph/ceph.conf
+
+            store_description = "az0 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            '
+          networkAttachments:
+          - storage
+          override:
+            service:
+              internal:
+                metadata:
+                  annotations:
+                    metallb.universe.tf/address-pool: internalapi
+                    metallb.universe.tf/allow-shared-ip: internalapi
+                    metallb.universe.tf/loadBalancerIPs: 172.17.0.81
+                spec:
+                  type: LoadBalancer
+          preserveJobs: false
+          replicas: 3
+          type: edge
+        az2:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_import_methods = [web-download,copy-image,glance-direct]
+
+            enabled_backends = az0:rbd,az2:rbd
+
+
+            [glance_store]
+
+            stores = http,rbd
+
+            default_backend = az2
+
+
+            [az2]
+
+            rbd_store_ceph_conf = /etc/ceph/az2.conf
+
+            store_description = "az2 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            [az0]
+
+            rbd_store_ceph_conf = /etc/ceph/az2.conf
+
+            store_description = "az0 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+            enabled_import_methods = [web-download,copy-image,glance-direct]
+
+
+            '
+          networkAttachments:
+          - storage
+          override:
+            service:
+              internal:
+                metadata:
+                  annotations:
+                    metallb.universe.tf/address-pool: internalapi
+                    metallb.universe.tf/allow-shared-ip: internalapi
+                    metallb.universe.tf/loadBalancerIPs: 172.17.0.82
+                spec:
+                  type: LoadBalancer
+          preserveJobs: false
+          replicas: 3
+          type: edge
+        default:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_import_methods = [web-download,copy-image,glance-direct]
+
+            enabled_backends = az0:rbd,az1:rbd,az2:rbd
+
+
+            [glance_store]
+
+            stores = http,rbd
+
+            default_backend = az0
+
+
+            [az0]
+
+            rbd_store_ceph_conf = /etc/ceph/ceph.conf
+
+            store_description = "az0 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            [az1]
+
+            rbd_store_ceph_conf = /etc/ceph/az1.conf
+
+            store_description = "az1 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            [az2]
+
+            rbd_store_ceph_conf = /etc/ceph/az2.conf
+
+            store_description = "az2 RBD backend"
+
+            rbd_store_pool = images
+
+            rbd_store_user = openstack
+
+
+            '
+          networkAttachments:
+          - storage
+          override:
+            service:
+              internal:
+                metadata:
+                  annotations:
+                    metallb.universe.tf/address-pool: internalapi
+                    metallb.universe.tf/allow-shared-ip: internalapi
+                    metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+                spec:
+                  type: LoadBalancer
+          preserveJobs: false
+          replicas: 3
+          type: split
+      keystoneEndpoint: default
+      serviceUser: glance
+      storageClass: local-storage
+      storageRequest: 10G
+  heat:
+    apiOverride:
+      route: {}
+    cnfAPIOverride:
+      route: {}
+    enabled: false
+    template:
+      databaseInstance: openstack
+      heatAPI:
+        override:
+          service:
+            internal:
+              metadata:
+                annotations:
+                  metallb.universe.tf/address-pool: internalapi
+                  metallb.universe.tf/allow-shared-ip: internalapi
+                  metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+              spec:
+                type: LoadBalancer
+        replicas: 1
+      heatEngine:
+        override:
+          service:
+            internal:
+              metadata:
+                annotations:
+                  metallb.universe.tf/address-pool: internalapi
+                  metallb.universe.tf/allow-shared-ip: internalapi
+                  metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+              spec:
+                type: LoadBalancer
+        replicas: 1
+      secret: osp-secret
+  horizon:
+    apiOverride:
+      route: {}
+    enabled: true
+    template:
+      replicas: 1
+      secret: osp-secret
+  ironic:
+    enabled: false
+    template:
+      databaseInstance: openstack
+      ironicAPI:
+        replicas: 1
+      ironicConductors:
+      - replicas: 1
+        storageRequest: 10G
+      ironicInspector:
+        replicas: 1
+      ironicNeutronAgent:
+        replicas: 1
+      secret: osp-secret
+  keystone:
+    apiOverride:
+      route: {}
+    template:
+      databaseInstance: openstack
+      override:
+        service:
+          internal:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/allow-shared-ip: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+            spec:
+              type: LoadBalancer
+      secret: osp-secret
+  manila:
+    apiOverride:
+      route: {}
+    enabled: true
+    template:
+      manilaAPI:
+        customServiceConfig: '[DEFAULT]
+
+          enabled_share_protocols=nfs,cephfs
+
+          '
+        networkAttachments:
+        - internalapi
+        override:
+          service:
+            internal:
+              metadata:
+                annotations:
+                  metallb.universe.tf/address-pool: internalapi
+                  metallb.universe.tf/allow-shared-ip: internalapi
+                  metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+              spec:
+                type: LoadBalancer
+        replicas: 1
+      manilaScheduler:
+        replicas: 1
+      manilaShares:
+        share1:
+          customServiceConfig: '[DEFAULT]
+
+            enabled_share_backends = cephfs
+
+            enabled_share_protocols = cephfs
+
+            [cephfs]
+
+            driver_handles_share_servers = False
+
+            share_backend_name = cephfs
+
+            share_driver = manila.share.drivers.cephfs.driver.CephFSDriver
+
+            cephfs_conf_path = /etc/ceph/ceph.conf
+
+            cephfs_cluster_name = ceph
+
+            cephfs_auth_id=openstack
+
+            cephfs_volume_mode = 0755
+
+            cephfs_protocol_helper_type = CEPHFS
+
+            '
+          networkAttachments:
+          - storage
+          replicas: 1
+  mariadb:
+    enabled: false
+    templates:
+      openstack:
+        storageRequest: 500M
+      openstack-cell1:
+        storageRequest: 500M
+  memcached:
+    templates:
+      memcached:
+        replicas: 1
+  neutron:
+    apiOverride:
+      route: {}
+    template:
+      databaseInstance: openstack
+      networkAttachments:
+      - internalapi
+      override:
+        service:
+          internal:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/allow-shared-ip: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+            spec:
+              type: LoadBalancer
+      secret: osp-secret
+  nova:
+    apiOverride:
+      route: {}
+    template:
+      apiServiceTemplate:
+        override:
+          service:
+            internal:
+              metadata:
+                annotations:
+                  metallb.universe.tf/address-pool: internalapi
+                  metallb.universe.tf/allow-shared-ip: internalapi
+                  metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+              spec:
+                type: LoadBalancer
+      metadataServiceTemplate:
+        override:
+          service:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/allow-shared-ip: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+            spec:
+              type: LoadBalancer
+      secret: osp-secret
+  octavia:
+    enabled: false
+    template:
+      databaseInstance: openstack
+      octaviaAPI:
+        replicas: 1
+      secret: osp-secret
+  ovn:
+    template:
+      ovnController:
+        networkAttachment: tenant
+        nicMappings:
+          datacentre: ospbr
+      ovnDBCluster:
+        ovndbcluster-nb:
+          dbType: NB
+          networkAttachment: internalapi
+          storageRequest: 10G
+        ovndbcluster-sb:
+          dbType: SB
+          networkAttachment: internalapi
+          storageRequest: 10G
+      ovnNorthd:
+        networkAttachment: internalapi
+  placement:
+    apiOverride:
+      route: {}
+    template:
+      databaseInstance: openstack
+      override:
+        service:
+          internal:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/allow-shared-ip: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+            spec:
+              type: LoadBalancer
+      secret: osp-secret
+  rabbitmq:
+    templates:
+      rabbitmq:
+        override:
+          service:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.85
+            spec:
+              type: LoadBalancer
+        replicas: 3
+      rabbitmq-cell1:
+        override:
+          service:
+            metadata:
+              annotations:
+                metallb.universe.tf/address-pool: internalapi
+                metallb.universe.tf/loadBalancerIPs: 172.17.0.86
+            spec:
+              type: LoadBalancer
+        replicas: 3
+  redis:
+    enabled: false
+  secret: osp-secret
+  storageClass: local-storage
+  swift:
+    enabled: false
+    proxyOverride:
+      route: {}
+    template:
+      swiftProxy:
+        override:
+          service:
+            internal:
+              metadata:
+                annotations:
+                  metallb.universe.tf/address-pool: internalapi
+                  metallb.universe.tf/allow-shared-ip: internalapi
+                  metallb.universe.tf/loadBalancerIPs: 172.17.0.80
+              spec:
+                type: LoadBalancer
+        replicas: 1
+      swiftRing:
+        ringReplicas: 1
+      swiftStorage:
+        replicas: 1
+---
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneDeployment
+metadata:
+  name: edpm-deployment-post-ceph-az2
+  namespace: openstack
+spec:
+  nodeSets:
+  - openstack-edpm-az2
+---
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneNodeSet
+metadata:
+  name: openstack-edpm-az2
+  namespace: openstack
+spec:
+  env:
+  - name: ANSIBLE_FORCE_COLOR
+    value: 'True'
+  networkAttachments:
+  - ctlplane
+  nodeTemplate:
+    ansible:
+      ansiblePort: 22
+      ansibleUser: zuul
+      ansibleVars:
+        edpm_ceph_hci_pre_enabled_services:
+        - ceph_mon
+        - ceph_mgr
+        - ceph_osd
+        - ceph_rgw
+        - ceph_nfs
+        - ceph_rgw_frontend
+        - ceph_nfs_frontend
+        edpm_fips_mode: check
+        edpm_iscsid_image: '{{ registry_url }}/openstack-iscsid:{{ image_tag }}'
+        edpm_logrotate_crond_image: '{{ registry_url }}/openstack-cron:{{ image_tag
+          }}'
+        edpm_network_config_hide_sensitive_logs: false
+        edpm_network_config_os_net_config_mappings:
+          edpm-compute-6:
+            nic1: 52:54:00:75:33:0a
+            nic2: 52:54:00:6a:28:6f
+          edpm-compute-7:
+            nic1: 52:54:00:33:6c:4c
+            nic2: 52:54:00:7a:95:5b
+          edpm-compute-8:
+            nic1: 52:54:00:4b:58:8d
+            nic2: 52:54:00:68:c2:4f
+        edpm_network_config_template: "---\n{% set mtu_list = [ctlplane_mtu] %}\n\
+          {% for network in nodeset_networks %}\n{{ mtu_list.append(lookup('vars',\
+          \ networks_lower[network] ~ '_mtu')) }}\n{%- endfor %}\n{% set min_viable_mtu\
+          \ = mtu_list | max %}\nnetwork_config:\n- type: ovs_bridge\n  name: {{ neutron_physical_bridge_name\
+          \ }}\n  mtu: {{ min_viable_mtu }}\n  use_dhcp: false\n  dns_servers: {{\
+          \ ctlplane_dns_nameservers }}\n  domain: {{ dns_search_domains }}\n  addresses:\n\
+          \  - ip_netmask: {{ ctlplane_ip }}/{{ ctlplane_cidr }}\n  routes: {{ ctlplane_host_routes\
+          \ }}\n  members:\n  - type: interface\n    name: nic2\n    mtu: {{ min_viable_mtu\
+          \ }}\n    # force the MAC address of the bridge to this interface\n    primary:\
+          \ true\n{% for network in nodeset_networks %}\n  - type: vlan\n    mtu:\
+          \ {{ lookup('vars', networks_lower[network] ~ '_mtu') }}\n    vlan_id: {{\
+          \ lookup('vars', networks_lower[network] ~ '_vlan_id') }}\n    addresses:\n\
+          \    - ip_netmask:\n        {{ lookup('vars', networks_lower[network] ~\
+          \ '_ip') }}/{{ lookup('vars', networks_lower[network] ~ '_cidr') }}\n  \
+          \  routes: {{ lookup('vars', networks_lower[network] ~ '_host_routes') }}\n\
+          {% endfor %}\n"
+        edpm_neutron_metadata_agent_image: '{{ registry_url }}/openstack-neutron-metadata-agent-ovn:{{
+          image_tag }}'
+        edpm_nodes_validation_validate_controllers_icmp: false
+        edpm_nodes_validation_validate_gateway_icmp: false
+        edpm_nova_compute_container_image: '{{ registry_url }}/openstack-nova-compute:{{
+          image_tag }}'
+        edpm_nova_libvirt_container_image: '{{ registry_url }}/openstack-nova-libvirt:{{
+          image_tag }}'
+        edpm_ovn_controller_agent_image: '{{ registry_url }}/openstack-ovn-controller:{{
+          image_tag }}'
+        edpm_selinux_mode: enforcing
+        edpm_sshd_allowed_ranges:
+        - 192.168.122.0/24
+        - 192.168.111.0/24
+        edpm_sshd_configure_firewall: true
+        enable_debug: false
+        gather_facts: false
+        image_tag: current-podified
+        neutron_physical_bridge_name: br-ex
+        neutron_public_interface_name: eth0
+        registry_url: quay.io/podified-antelope-centos9
+        service_net_map:
+          nova_api_network: internalapi
+          nova_libvirt_network: internalapi
+        storage_mgmt_cidr: '24'
+        storage_mgmt_host_routes: []
+        storage_mgmt_mtu: 9000
+        storage_mgmt_vlan_id: 23
+        storage_mtu: 9000
+        timesync_ntp_servers:
+        - hostname: pool.ntp.org
+    ansibleSSHPrivateKeySecret: dataplane-ansible-ssh-private-key-secret
+    extraMounts:
+    - extraVolType: Ceph
+      mounts:
+      - mountPath: /etc/ceph
+        name: ceph
+        readOnly: true
+      volumes:
+      - name: ceph
+        secret:
+          secretName: ceph-conf-files
+    managementNetwork: ctlplane
+    networks:
+    - defaultRoute: true
+      name: ctlplane
+      subnetName: subnet1
+    - name: internalapi
+      subnetName: subnet1
+    - name: storage
+      subnetName: subnet1
+    - name: tenant
+      subnetName: subnet1
+  nodes:
+    edpm-compute-6:
+      ansible:
+        host: 192.168.122.106
+      hostName: compute-6
+      networks:
+      - defaultRoute: true
+        fixedIP: 192.168.122.106
+        name: ctlplane
+        subnetName: subnet1
+      - name: internalapi
+        subnetName: subnet1
+      - name: storage
+        subnetName: subnet1
+      - name: storagemgmt
+        subnetName: subnet1
+      - name: tenant
+        subnetName: subnet1
+    edpm-compute-7:
+      ansible:
+        host: 192.168.122.107
+      hostName: compute-7
+      networks:
+      - defaultRoute: true
+        fixedIP: 192.168.122.107
+        name: ctlplane
+        subnetName: subnet1
+      - name: internalapi
+        subnetName: subnet1
+      - name: storage
+        subnetName: subnet1
+      - name: storagemgmt
+        subnetName: subnet1
+      - name: tenant
+        subnetName: subnet1
+    edpm-compute-8:
+      ansible:
+        host: 192.168.122.108
+      hostName: compute-8
+      networks:
+      - defaultRoute: true
+        fixedIP: 192.168.122.108
+        name: ctlplane
+        subnetName: subnet1
+      - name: internalapi
+        subnetName: subnet1
+      - name: storage
+        subnetName: subnet1
+      - name: storagemgmt
+        subnetName: subnet1
+      - name: tenant
+        subnetName: subnet1
+  preProvisioned: true
+  services:
+  - install-certs
+  - ceph-client
+  - ovn
+  - neutron-metadata
+  - libvirt
+  - nova-custom-ceph-az2
+---
+apiVersion: dataplane.openstack.org/v1beta1
+kind: OpenStackDataPlaneService
+metadata:
+  name: nova-custom-ceph-az2
+  namespace: openstack
+spec:
+  caCerts: combined-ca-bundle
+  configMaps:
+  - ceph-nova-az2
+  label: dataplane-deployment-nova-custom-ceph
+  playbook: osp.edpm.nova
+  secrets:
+  - nova-cell1-compute-config
+  - nova-migration-ssh-key
+  tlsCert:
+    contents:
+    - dnsnames
+    - ips
+    issuer: osp-rootca-issuer-internal
+    networks:
+    - ctlplane
