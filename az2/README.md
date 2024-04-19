@@ -62,12 +62,12 @@ configuration from the `diff` command shows a pattern:
 
 If another AZ N was added, the next step of the pattern would be:
 
-1. The AZ0 split Glance has 4 backends: AZ0 (default), AZ1, AZ2, AZN
+1. The AZ0 split Glance has N backends: AZ0 (default), AZ1, AZ2, AZN
 2. The AZ1 edge Glance has 2 backends: AZ1 (defaullt), AZ0
 3. The AZ2 edge Glance has 2 backends: AZ2 (defaullt), AZ0
 4. The new AZN edge Glance has 2 backends: AZN (defaullt), AZ0
 5. A new end point at glance-azN-internal.openstack.svc
-   which uses loadBalancerIPs: 172.17.0.8N
+   which uses loadBalancerIPs: 172.17.0.(80+N)
 6. A new Cinder volume service was added for AZN
 7. New compute nodes in AZN use the new ceph cluster for AZN
 
