@@ -60,11 +60,10 @@ enabling parts of the script in sequence. The script will call other
 scripts to modify the CRs. This is necessary so that only three EDPM
 nodes are deployed for the default AZ (see [design](../design.md)).
 
-Use `azN.sh` to deploy AZ1 (see [design](../design.md)). This script
-does not yet correctly configure AZ2.
+Use `azN.sh` to deploy AZ1 (see [design](../design.md)) and AZ2 (set `NUM=2`).
 
-Use `test.sh` to test that the default AZ (aka AZ0) and AZ1 work as
-expected.
+Use `test.sh` to test that the default AZ (aka AZ0) and AZ1 or AZ2
+work as expected.
 
 The other python and shell scripts and configuration files in the
 extra directory are called by the above shell scripts. These scripts
