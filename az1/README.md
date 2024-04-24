@@ -75,7 +75,7 @@ of [post-ceph-az1.yaml](post-ceph-az1.yaml) is configured with two
 1. `ceph` which is configured to use the default ceph backend hosted
    on the first set of edpm compute nodes (compute-{0,1,2}).
 
-2. `az1` with `storage_availability_zone` set to `az1` and its
+2. `az1` with `backend_availability_zone` set to `az1` and its
    `glance_api_servers` set to
    `http://glance-az1-internal.openstack.svc:9292`.
    It is also configured to use `az1` ceph backend hosted on the

@@ -104,14 +104,12 @@ spec:
 
             enabled_backends = ceph
 
-            storage_availability_zone = az1
-
-            default_availability_zone = az1
-
             glance_api_servers = http://glance-az1-internal.openstack.svc:9292
 
 
             [ceph]
+
+            backend_availability_zone = az1
 
             volume_backend_name = ceph
 

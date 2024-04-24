@@ -232,20 +232,13 @@ def add_cinder_az(cfg, az):
     cinder_cp.read_string(cfg['customServiceConfig'])
     if 'DEFAULT' not in cinder_cp:
         cinder_cp['DEFAULT'] = {}
-    cinder_cp['DEFAULT']['storage_availability_zone'] = az
-    cinder_cp['DEFAULT']['default_availability_zone'] = az
-
     # Relying on convention, confirm with:
     # `oc describe glance glance | grep 'API Endpoint' -C 2`
     glance_endpoint = "http://glance-" + az + "-internal.openstack.svc:9292"
     cinder_cp['DEFAULT']['glance_api_servers'] = glance_endpoint
 
-    # We used this setting in the past, but I assume not anymore
-    # cinder_cp['DEFAULT']['cluster'] = az
-
     cinder_cp['ceph']['rbd_cluster_name'] = az
-    # We used this setting in the past, but I assume not anymore
-    # cinder_cp['ceph']['backend_host']
+    cinder_cp['ceph']['backend_availability_zone'] = az
 
     # convert the customServiceConfig back to a string
     str_config = StringIO()
