@@ -86,4 +86,19 @@ If another AZ N was added, the next step of the pattern would be:
 6. A new Cinder volume service was added for AZN
 7. New compute nodes in AZN use the new ceph cluster for AZN
 
+Note that size of the Internal API network pool will need to be large
+enough to accommodate the number of DCN sites. In the example below
+only 10 IPs are available (from .80 to .90) so only 10 DCN sites can
+have load balancer IPs (for each internal Glance endpiont), until the
+size of the IP address pool is increased.
+```
+$ oc get ipaddresspool -n metallb-system
+NAME          AUTO ASSIGN   AVOID BUGGY IPS   ADDRESSES
+ctlplane      true          false             ["192.168.122.80-192.168.122.90"]
+internalapi   true          false             ["172.17.0.80-172.17.0.90"]
+storage       true          false             ["172.18.0.80-172.18.0.90"]
+tenant        true          false             ["172.19.0.80-172.19.0.90"]
+$
+```
+
 With each AZ site added, the the AZ0 glance is updated to use the new Ceph backend.
