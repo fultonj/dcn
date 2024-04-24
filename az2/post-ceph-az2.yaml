@@ -265,6 +265,8 @@ spec:
 
             rbd_store_user = openstack
 
+            rbd_thin_provisioning = False
+
 
             [az0]
 
@@ -275,6 +277,8 @@ spec:
             rbd_store_pool = images
 
             rbd_store_user = openstack
+
+            rbd_thin_provisioning = False
 
 
             '
@@ -316,6 +320,9 @@ spec:
 
             rbd_store_user = openstack
 
+            rbd_thin_provisioning = False
+
+
 
             [az0]
 
@@ -327,7 +334,8 @@ spec:
 
             rbd_store_user = openstack
 
-            enabled_import_methods = [web-download,copy-image,glance-direct]
+            rbd_thin_provisioning = False
+
 
 
             '
@@ -369,6 +377,8 @@ spec:
 
             rbd_store_user = openstack
 
+            rbd_thin_provisioning = False
+
 
             [az1]
 
@@ -380,6 +390,8 @@ spec:
 
             rbd_store_user = openstack
 
+            rbd_thin_provisioning = False
+
 
             [az2]
 
@@ -390,6 +402,8 @@ spec:
             rbd_store_pool = images
 
             rbd_store_user = openstack
+
+            rbd_thin_provisioning = False
 
 
             '

@@ -233,6 +233,8 @@ spec:
 
             rbd_store_user = openstack
 
+            rbd_thin_provisioning = False
+
 
             [az0]
 
@@ -243,6 +245,8 @@ spec:
             rbd_store_pool = images
 
             rbd_store_user = openstack
+
+            rbd_thin_provisioning = False
 
 
             '
@@ -284,6 +288,8 @@ spec:
 
             rbd_store_user = openstack
 
+            rbd_thin_provisioning = False
+
 
             [az1]
 
@@ -294,6 +300,8 @@ spec:
             rbd_store_pool = images
 
             rbd_store_user = openstack
+
+            rbd_thin_provisioning = False
 
 
             '
