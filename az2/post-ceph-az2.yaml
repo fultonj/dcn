@@ -252,8 +252,6 @@ spec:
 
             [glance_store]
 
-            stores = http,rbd
-
             default_backend = az1
 
 
@@ -304,8 +302,6 @@ spec:
 
 
             [glance_store]
-
-            stores = http,rbd
 
             default_backend = az2
 
@@ -359,8 +355,6 @@ spec:
 
 
             [glance_store]
-
-            stores = http,rbd
 
             default_backend = az0
 

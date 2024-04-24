@@ -119,7 +119,6 @@ def glance_conf_helper(az0_conf, azn_conf, backend_list):
 
         if 'glance_store' not in new_cfg:
             new_cfg['glance_store'] = {}
-        new_cfg['glance_store']['stores'] = "http,rbd"
         # The default backend is the first item on backend_list
         new_cfg['glance_store']['default_backend'] = "az" + str(backend_list[0])
     else:
