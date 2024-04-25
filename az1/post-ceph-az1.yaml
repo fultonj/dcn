@@ -233,7 +233,7 @@ spec:
 
             rbd_store_user = openstack
 
-            rbd_thin_provisioning = False
+            rbd_thin_provisioning = True
 
 
             [az0]
@@ -246,7 +246,7 @@ spec:
 
             rbd_store_user = openstack
 
-            rbd_thin_provisioning = False
+            rbd_thin_provisioning = True
 
 
             '
@@ -288,7 +288,7 @@ spec:
 
             rbd_store_user = openstack
 
-            rbd_thin_provisioning = False
+            rbd_thin_provisioning = True
 
 
             [az1]
@@ -301,7 +301,7 @@ spec:
 
             rbd_store_user = openstack
 
-            rbd_thin_provisioning = False
+            rbd_thin_provisioning = True
 
 
             '

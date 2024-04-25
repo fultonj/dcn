@@ -202,7 +202,7 @@ spec:
         store_description = "RBD backend"
         rbd_store_pool = images
         rbd_store_user = openstack
-        rbd_thin_provisioning = False
+        rbd_thin_provisioning = True
       databaseInstance: openstack
       glanceAPIs:
         default:
