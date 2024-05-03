@@ -17,7 +17,7 @@ pushd $CIFMW
 export N=2
 echo -e "localhost ansible_connection=local\n[computes]" > inventory.yml
 for I in $(seq $START $((N+$START))); do
-    echo 192.168.122.${I} >> inventory.yml
+    echo 192.168.122.${I} ansible_ssh_private_key_file=/home/zuul/.ssh/id_cifw >> inventory.yml
 done
 export ANSIBLE_REMOTE_USER=zuul
 export ANSIBLE_SSH_PRIVATE_KEY=~/.ssh/id_cifw
@@ -30,6 +30,7 @@ if [ $? -gt 0 ]; then
 fi
 ln -fs ~/dcn/extra/ceph.yaml
 ln -fs ~/dcn/extra/$2
+# hci.yml must be copied from custom/hci.yaml of ci-framework
 ln -fs ~/hci.yaml
 ANSIBLE_GATHERING=implicit ansible-playbook playbooks/ceph.yml -e @hci.yaml -e @ceph.yaml -e @$2
 popd

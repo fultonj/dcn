@@ -27,7 +27,7 @@ if [ $NUM -eq 1 ]; then
     END=5
     CEPH_LAST_OCTET=103
     CEPH_OVERRIDE=ceph_az1.yaml
-    EDPM_PRE_CR=edpm-deployment-pre-ceph-az1
+    EDPM_PRE_CR=openstack-edpm-az1
     EDPM_POST_CR=edpm-deployment-post-ceph-az1
 fi
 if [ $NUM -eq 2 ]; then
@@ -35,7 +35,7 @@ if [ $NUM -eq 2 ]; then
     END=8
     CEPH_LAST_OCTET=106
     CEPH_OVERRIDE=ceph_az2.yaml
-    EDPM_PRE_CR=edpm-deployment-pre-ceph-az2
+    EDPM_PRE_CR=openstack-edpm-az2
     EDPM_POST_CR=edpm-deployment-post-ceph-az2
 fi
 
@@ -57,12 +57,12 @@ if [ $SETUP_PREV -eq 1 ]; then
     # Identify current control plane CR (before deploying another control plane)
     export CONTROL_PLANE_CR_FILE=~/control-plane-cr.yaml
     # Look at the previous N
-    POST_CEPH_SRC=$ARCH/examples/va/hci/post-ceph-azN.yaml
+    POST_CEPH_SRC=$ARCH/examples/va/hci/nodeset-post-ceph-azN.yaml
     if [[ ! -e $POST_CEPH_SRC ]]; then
         # if azN.sh has not been run before to create this file
         # then use the one from az0.sh
         # It is called dataplane-post-ceph.yaml, but post-ceph.yaml is a better name
-        POST_CEPH_SRC=$ARCH/examples/va/hci/dataplane-post-ceph.yaml
+        POST_CEPH_SRC=$ARCH/examples/va/hci/nodeset-post-ceph.yaml
         if [[ ! -e $POST_CEPH_SRC ]]; then
 	    echo "Control Plane CR from first deployment is missing; unable to copy"
 	    exit 1
@@ -84,7 +84,7 @@ pushd $ARCH
 
 
 if [ $DATAPLANE -eq 1 ]; then
-    SRC=~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-values/values.yaml
+    SRC=~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-nodeset-values/values.yaml
     if [[ ! -e $SRC ]]; then
         echo "$SRC is missing"
         exit 1
@@ -92,16 +92,32 @@ if [ $DATAPLANE -eq 1 ]; then
     echo -e "\noc get pods -w -l app=openstackansibleee\n"
 
     pushd examples/va/hci/
-    python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/values.yaml --beg $BEG --end $END
-    kustomize build edpm-pre-ceph > dataplane-pre-ceph-azN-temp.yaml
+    python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/nodeset/values.yaml --beg $BEG --end $END
+    kustomize build edpm-pre-ceph/nodeset > nodeset-pre-ceph-azN-temp.yaml
     # change the name to include azN and exclude secrets
-    python ~/dcn/extra/nodeset_name.py dataplane-pre-ceph-azN-temp.yaml dataplane-pre-ceph-azN.yaml --num $NUM
+    python ~/dcn/extra/nodeset_name.py nodeset-pre-ceph-azN-temp.yaml nodeset-pre-ceph-azN.yaml --num $NUM
 
-    cp -v dataplane-pre-ceph-azN.yaml $BACKUP/dataplane-pre-ceph-az${NUM}.yaml
+    cp -v nodeset-pre-ceph-azN.yaml $BACKUP/nodeset-pre-ceph-az${NUM}.yaml
     if [ $APPLY -eq 1 ]; then
-        oc apply -f dataplane-pre-ceph-azN.yaml
-        oc wait osdpd $EDPM_PRE_CR --for condition=Ready --timeout=1200s
+        oc apply -f nodeset-pre-ceph-azN.yaml
+	oc wait osdpns $EDPM_PRE_CR --for condition=SetupReady --timeout=600s
     fi
+
+    SRC=~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-deployment-values/values.yaml
+    if [[ ! -e $SRC ]]; then
+        echo "$SRC is missing"
+        exit 1
+    fi
+
+    cp $SRC edpm-pre-ceph/deployment/
+    kustomize build edpm-pre-ceph/deployment > deployment-pre-ceph-azN-temp.yaml
+    python ~/dcn/extra/nodeset_name.py deployment-pre-ceph-azN-temp.yaml deployment-pre-ceph-azN.yaml --num $NUM
+    cp -v deployment-pre-ceph-azN.yaml $BACKUP/deployment-pre-ceph-az${NUM}.yaml
+    if [ $APPLY -eq 1 ]; then
+        oc apply -f deployment-pre-ceph-azN.yaml
+        oc wait osdpns $EDPM_PRE_CR --for condition=Ready --timeout=1500s
+    fi
+    
     popd
 fi
 
@@ -122,8 +138,12 @@ if [ $POSTCEPH -eq 1 ]; then
     pushd examples/va/hci/
     cp $SRC1 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/values.yaml
     # This effectively copies $SRC2 but also disables manila
-    yq e '.data.manila.enabled = false' $SRC2 > ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
-    kustomize build > post-ceph-azN-temp.yaml
+    yq '.data.manila.enabled = false' $SRC2 > ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
+    kustomize build > nodeset-post-ceph-azN-temp.yaml
+    kustomize build deployment > deployment-post-ceph-azN-temp.yaml
+
+    # change the name to include azN and exclude secrets
+    python ~/dcn/extra/nodeset_name.py deployment-post-ceph-azN-temp.yaml deployment-post-ceph-azN.yaml --num $NUM
 
     # Modify kustomize output with python to suit DCN scenario for any azN > 0
     # with post-ceph-azn.py.
@@ -136,23 +156,28 @@ if [ $POSTCEPH -eq 1 ]; then
     #
     # For the data plane we want:
     #   - to deploy the same genereated post ceph config
-    python ~/dcn/extra/post-ceph-azn.py post-ceph-azN-temp.yaml post-ceph-azN.yaml \
+    python ~/dcn/extra/post-ceph-azn.py nodeset-post-ceph-azN-temp.yaml nodeset-post-ceph-azN.yaml \
 	   --num $NUM \
 	   --ceph-secret $CEPH_SECRET_FILE \
 	   --control-plane-cr $CONTROL_PLANE_CR_FILE
 
-    cp -v post-ceph-azN.yaml $BACKUP/post-ceph-az${NUM}.yaml
+    cp -v nodeset-post-ceph-azN.yaml $BACKUP/nodeset-post-ceph-az${NUM}.yaml
+    cp -v deployment-post-ceph-azN.yaml $BACKUP/deployment-post-ceph-az${NUM}.yaml
 
     # Apply the single modified post-ceph-azN.yaml file
     if [ $APPLY -eq 1 ]; then
-        oc apply -f post-ceph-azN.yaml
+	oc apply -f nodeset-post-ceph-azN.yaml
+
+        oc wait osdpns $EDPM_PRE_CR --for condition=SetupReady --timeout=600s
+
+        oc apply -f deployment-post-ceph-azN.yaml
 
         echo -e "\noc get pods -n openstack -w\n"
         oc wait osctlplane controlplane --for condition=Ready --timeout=600s
 
         # Wait for ansible to finish
         echo -e "\noc get pods -w -l app=openstackansibleee\n"
-        oc wait osdpd $EDPM_POST_CR --for condition=Ready --timeout=1200s
+        oc wait osdpd $EDPM_POST_CR --for condition=Ready --timeout=40m
     fi
     popd
 fi
