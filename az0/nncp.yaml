@@ -87,10 +87,7 @@ spec:
       state: up
       type: linux-bridge
     routes:
-      config:
-      - destination: 0.0.0.0/0
-        next-hop-address: 192.168.122.1
-        next-hop-interface: ospbr
+      config: []
   nodeSelector:
     kubernetes.io/hostname: master-0
     node-role.kubernetes.io/worker: ""
@@ -184,10 +181,7 @@ spec:
       state: up
       type: linux-bridge
     routes:
-      config:
-      - destination: 0.0.0.0/0
-        next-hop-address: 192.168.122.1
-        next-hop-interface: ospbr
+      config: []
   nodeSelector:
     kubernetes.io/hostname: master-1
     node-role.kubernetes.io/worker: ""
@@ -281,10 +275,7 @@ spec:
       state: up
       type: linux-bridge
     routes:
-      config:
-      - destination: 0.0.0.0/0
-        next-hop-address: 192.168.122.1
-        next-hop-interface: ospbr
+      config: []
   nodeSelector:
     kubernetes.io/hostname: master-2
     node-role.kubernetes.io/worker: ""

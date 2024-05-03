@@ -22,8 +22,8 @@ APPLY=1
 mkdir -p /tmp/dcn/az0
 
 for F in yq kustomize; do
-    if [[ ! -e ~/bin/$F ]]; then
-        echo "Aborting: $F is not in ~/bin/$F"
+    if [[ ! -e ~/.local/bin/$F ]] && [[ ! -e ~/bin/$F ]]; then
+        echo "Aborting: $F is not in ~/[.local/]bin/$F"
         exit 1
     fi
 done
@@ -113,7 +113,7 @@ if [ $CONTROLPLANE -eq 1 ]; then
 fi
 
 if [ $DATAPLANE -eq 1 ]; then
-    SRC=~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-values/values.yaml
+    SRC=~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-nodeset-values/values.yaml
     if [[ ! -e $SRC ]]; then
         echo "$SRC is missing"
         exit 1
@@ -121,12 +121,26 @@ if [ $DATAPLANE -eq 1 ]; then
     echo -e "\noc get pods -w -l app=openstackansibleee\n"
 
     pushd examples/va/hci/
-    python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/values.yaml --beg 0 --end 2
-    kustomize build edpm-pre-ceph > dataplane-pre-ceph.yaml
-    cp -v dataplane-pre-ceph.yaml /tmp/dcn/az0
+    python ~/dcn/extra/node_filter.py $SRC edpm-pre-ceph/nodeset/values.yaml --beg 0 --end 2
+    kustomize build edpm-pre-ceph/nodeset > nodeset-pre-ceph.yaml
+    cp -v nodeset-pre-ceph.yaml /tmp/dcn/az0
     if [ $APPLY -eq 1 ]; then
-        oc apply -f dataplane-pre-ceph.yaml
-        oc wait osdpd edpm-deployment-pre-ceph --for condition=Ready --timeout=1200s
+        oc apply -f nodeset-pre-ceph.yaml
+        oc wait osdpns openstack-edpm --for condition=SetupReady --timeout=600s
+    fi
+
+    SRC=~/ci-framework-data/artifacts/ci_gen_kustomize_values/edpm-deployment-values/values.yaml
+    if [[ ! -e $SRC ]]; then
+        echo "$SRC is missing"
+        exit 1
+    fi
+    
+    cp $SRC edpm-pre-ceph/deployment/
+    kustomize build edpm-pre-ceph/deployment > deployment-pre-ceph.yaml
+    cp -v deployment-pre-ceph.yaml /tmp/dcn/az0
+    if [ $APPLY -eq 1 ]; then
+        oc apply -f deployment-pre-ceph.yaml
+        oc wait osdpns openstack-edpm --for condition=Ready --timeout=1500s
     fi
     popd
 fi
@@ -148,27 +162,33 @@ if [ $POSTCEPH -eq 1 ]; then
     pushd examples/va/hci/
     cp $SRC1 ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/values.yaml
     # This effectively copies $SRC2 but also disables manila
-    yq e '.data.manila.enabled = false' $SRC2 > ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
+    yq '.data.manila.enabled = false' $SRC2 > ~/src/github.com/openstack-k8s-operators/architecture/examples/va/hci/service-values.yaml
 
-    kustomize build > post-ceph.yaml
+    kustomize build > nodeset-post-ceph.yaml
+    kustomize build deployment > deployment-post-ceph.yaml
 
-    NODES=$(grep edpm-compute post-ceph.yaml | awk {'print $1'} | sort | uniq | wc -l)
+    NODES=$(grep edpm-compute nodeset-post-ceph.yaml | awk {'print $1'} | sort | uniq | wc -l)
     if [[ ! $NODES -eq 3 ]]; then
         echo "Aborting. You only want to deploy 3 nodes, not $NODES"
-        grep edpm-compute post-ceph.yaml | awk {'print $1'} | sort | uniq
-        echo "$PWD/post-ceph.yaml"
+        grep edpm-compute nodeset-post-ceph.yaml | awk {'print $1'} | sort | uniq
+        echo "$PWD/nodeset-post-ceph.yaml"
         exit 1
     fi
 
-    cp -v post-ceph.yaml /tmp/dcn/az0
+    cp -v nodeset-post-ceph.yaml /tmp/dcn/az0
+    cp -v deployment-post-ceph.yaml /tmp/dcn/az0
     if [ $APPLY -eq 1 ]; then
-        oc apply -f post-ceph.yaml
+        oc apply -f nodeset-post-ceph.yaml
+
+        oc wait osdpns openstack-edpm --for condition=SetupReady --timeout=600s
+
+        oc apply -f deployment-post-ceph.yaml
 
         echo -e "\noc get pods -n openstack -w\n"
         echo -e "\noc get pods -w -l app=openstackansibleee\n"
 
         oc wait osctlplane controlplane --for condition=Ready --timeout=600s
-        oc wait osdpd edpm-deployment-post-ceph --for condition=Ready --timeout=1200s
+        oc wait osdpd edpm-deployment-post-ceph --for condition=Ready --timeout=40m
     fi
     popd
 fi

@@ -347,7 +347,7 @@ fi
 if [ $SNAP_MV -eq 1 ]; then
     # Create a new image on AZn containing a snapshot of
     # the instance created in the previous section.
-    openstack server image create --name cirros-snapshot vm1-pet
+    openstack server image create --name cirros-snapshot $VM_NAME
     sleep 5
     openstack image list
     openstack volume snapshot list
