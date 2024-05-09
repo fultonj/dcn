@@ -18,6 +18,7 @@ CEPH=0
 POSTCEPH=0
 DISCOVER=0
 
+LVMS=0
 APPLY=1
 mkdir -p /tmp/dcn/az0
 
@@ -98,6 +99,10 @@ if [ $CONTROLPLANE -eq 1 ]; then
     kustomize build control-plane/nncp > nncp.yaml
     kustomize build control-plane > control-plane.yaml
 
+    if [ $LVMS -eq 1 ]; then
+        sed -i s/local-storage/lvms-local-storage/g control-plane.yaml
+    fi
+
     cp -v control-plane.yaml /tmp/dcn/az0
     if [ $APPLY -eq 1 ]; then
         oc apply -f nncp.yaml
@@ -173,6 +178,9 @@ if [ $POSTCEPH -eq 1 ]; then
         grep edpm-compute nodeset-post-ceph.yaml | awk {'print $1'} | sort | uniq
         echo "$PWD/nodeset-post-ceph.yaml"
         exit 1
+    fi
+    if [ $LVMS -eq 1 ]; then
+        sed -i s/local-storage/lvms-local-storage/g nodeset-post-ceph.yaml
     fi
 
     cp -v nodeset-post-ceph.yaml /tmp/dcn/az0
