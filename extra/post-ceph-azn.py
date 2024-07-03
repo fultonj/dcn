@@ -233,7 +233,7 @@ def add_cinder_az(cfg, az):
         cinder_cp['DEFAULT'] = {}
     # Relying on convention, confirm with:
     # `oc describe glance glance | grep 'API Endpoint' -C 2`
-    glance_endpoint = "http://glance-" + az + "-internal.openstack.svc:9292"
+    glance_endpoint = "https://glance-" + az + "-internal.openstack.svc:9292"
     cinder_cp['DEFAULT']['glance_api_servers'] = glance_endpoint
 
     cinder_cp['ceph']['rbd_cluster_name'] = az
@@ -335,7 +335,7 @@ def add_nova_az(data, num):
         nova_cp['glance'] = {}
     # Relying on convention, confirm with:
     # `oc describe glance glance | grep 'API Endpoint' -C 2`
-    glance_endpoint = "http://glance-az" + str(num) + "-internal.openstack.svc:9292"
+    glance_endpoint = "https://glance-az" + str(num) + "-internal.openstack.svc:9292"
     nova_cp['glance']['endpoint_override'] = glance_endpoint
     nova_cp['glance']['valid_interfaces'] = 'internal'
 
@@ -399,7 +399,7 @@ with open(args.dst, 'w') as f:
                 if data['kind'] == 'OpenStackDataPlaneDeployment':
                     data['spec']['nodeSets'][0] += "-az" + str(args.num)
                 if data['kind'] == 'OpenStackDataPlaneService':
-                    data['spec']['configMaps'][0] += "-az" + str(args.num)
+                    data['spec']['dataSources'][0]['configMapRef']['name'] += "-az" + str(args.num)
                 if data['kind'] == 'ConfigMap' and \
                    data['metadata']['name'] == "ceph-nova" + "-az" + str(args.num):
                     data = add_nova_az(data, args.num)
