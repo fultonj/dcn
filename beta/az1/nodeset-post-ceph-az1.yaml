@@ -473,6 +473,11 @@ spec:
     apiOverride:
       route: {}
     template:
+      customServiceConfig: |
+        [ml2_type_vlan]
+        network_vlan_ranges = datacentre:1:1000,leaf1:1:1000,leaf2:1:1000
+        [neutron]
+        physnets = datacentre, leaf1, leaf2
       databaseInstance: openstack
       networkAttachments:
       - internalapi
