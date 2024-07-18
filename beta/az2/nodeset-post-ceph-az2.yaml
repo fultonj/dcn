@@ -320,7 +320,7 @@ spec:
 
             [az2]
 
-            rbd_store_ceph_conf = /etc/ceph/az1.conf
+            rbd_store_ceph_conf = /etc/ceph/az2.conf
 
             store_description = "az2 RBD backend"
 
@@ -333,7 +333,7 @@ spec:
 
             [az0]
 
-            rbd_store_ceph_conf = /etc/ceph/az1.conf
+            rbd_store_ceph_conf = /etc/ceph/ceph.conf
 
             store_description = "az0 RBD backend"
 
@@ -403,7 +403,7 @@ spec:
 
             [az2]
 
-            rbd_store_ceph_conf = /etc/ceph/az1.conf
+            rbd_store_ceph_conf = /etc/ceph/az2.conf
 
             store_description = "az2 RBD backend"
 
