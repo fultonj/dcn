@@ -326,7 +326,7 @@ spec:
 
             [az0]
 
-            rbd_store_ceph_conf = /etc/ceph/az2.conf
+            rbd_store_ceph_conf = /etc/ceph/ceph.conf
 
             store_description = "az0 RBD backend"
 
